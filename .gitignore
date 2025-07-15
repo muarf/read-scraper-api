@@ -5,15 +5,20 @@ __pycache__/
 
 # C extensions
 *.so
-
+venv/
 # Distribution / packaging
 .Python
 build/
 develop-eggs/
 dist/
-downloads/
+chrome_extension/
+chromedriver-linux64/
 eggs/
 .eggs/
+firefox_extension/
+chromedriver-linux64.zip
+sites_custom.py
+ss.png
 lib/
 lib64/
 parts/
@@ -193,7 +198,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
+.pdf
 # Cursor
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
 #  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
