@@ -1,0 +1,56 @@
+<style>
+        .result-row:hover {
+            background-color: #f8f9fa; /* Changez la couleur de fond au survol */
+            cursor: pointer; /* Changez le curseur au survol pour montrer qu'il est cliquable */
+        }
+        /* Style pour la modal */
+/* Style pour la modal */
+.modal {
+    display: none; /* Par défaut, la modal est masquée */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background-color: #f8f8f8; /* Couleur de fond */
+    box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5); /* Petite ombre */
+    z-index: 1;
+    border-radius: 10px; /* Coins arrondis */
+    text-align: center; /* Centrer le contenu */
+}
+
+/* Style pour le contenu de la modal */
+.modal-content {
+    max-height: 300px;
+    overflow-y: auto; /* Ajoute une barre de défilement si le contenu dépasse la hauteur maximale */
+}
+
+/* Style pour le bouton de fermeture */
+.close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #333;
+}
+
+/* Style pour les liens dans le contenu */
+.modal-content a {
+    color: #007bff; /* Couleur du lien */
+    text-decoration: none;
+    font-weight: bold;
+}
+
+/* Style pour les liens visités dans le contenu */
+.modal-content a:visited {
+    color: #4a90e2; /* Couleur du lien visité */
+}
+
+/* Style pour les liens au survol dans le contenu */
+.modal-content a:hover {
+    text-decoration: underline;
+}
+
+    </style>

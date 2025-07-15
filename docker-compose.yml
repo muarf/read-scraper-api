@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  flask-app:
+    image: press:1
+    ports:
+      - "5000:5000"
+    environment:
+      - CHROMEDRIVER_PATH=/usr/bin/chromedriver
+    volumes:
+      - ./server:/app/server
+      - ./common:/app/common
+      - ./static:/app/static
+      - ./web_scraper:/app/web_scraper
+    depends_on:
+      - chromedriver
+    tty: true
+  chromedriver:
+    image: selenium/standalone-chrome
+    volumes:
+      - /dev/shm:/dev/shm
