@@ -69,7 +69,7 @@ def search_target_site(socketio, app, driver, query, title,session_id):
 
         # Soumettre le formulaire
         send_message_to_client(socketio, app,"Soumission du formulaire de recherche...", session_id)
-        submit_button.click()
+        driver.execute_script("arguments[0].click();", submit_button)
         # Attendre un certain temps pour que les résultats de la recherche se chargent
         try:
             # Attendre un certain temps pour que les résultats de la recherche se chargent
