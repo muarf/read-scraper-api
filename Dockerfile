@@ -1,5 +1,13 @@
-# Utiliser l'image Python 3.9
+# Utiliser l'image Python 3.10
 FROM python:3.10
+
+# Installer les dépendances système AVANT de copier les fichiers
+RUN apt-get update && \
+    apt-get install -y chromium-driver wkhtmltopdf && \
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt install ./google-chrome-stable_current_amd64.deb -y && \
+    rm google-chrome-stable_current_amd64.deb && \
+    apt-get clean
 
 # Définir le répertoire de travail dans le conteneur
 WORKDIR /app
@@ -10,12 +18,11 @@ COPY server /app/server
 COPY static /app/static
 COPY web_scraper /app/web_scraper
 COPY requirements.txt /app/
-# Installer les dépendances
+
+# Installer les dépendances Python
 RUN pip install -r /app/requirements.txt
 
 ENV PYTHONPATH "${PYTHONPATH}:/app/web_scraper"
+
 # Définir la commande d'exécution
 CMD ["python", "server/server.py"]
-RUN apt-get update && apt-get install -y chromium-driver wkhtmltopdf
-RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-RUN apt install ./google-chrome-stable_current_amd64.deb -y
