@@ -22,12 +22,26 @@ def extract_title(url, browser=None, max_words=15):
         if browser is not None:
             try:
                 browser.get(url)
-                # Attendre que la page charge
-                time.sleep(2)
+                # Attendre que la page charge et que le titre soit valide (pas la page anti-DDoS)
+                max_wait = 10  # Maximum 10 secondes
+                wait_interval = 0.5  # Vérifier toutes les 0.5 secondes
+                elapsed = 0
                 
-                # Extraire le titre depuis le browser
-                title = browser.title
-                print(f"Titre obtenu via browser en {time.time() - start:.2f} secondes")
+                while elapsed < max_wait:
+                    time.sleep(wait_interval)
+                    elapsed += wait_interval
+                    current_title = browser.title
+                    
+                    # Si le titre est valide (pas vide, pas "Un instant…", pas "Just a moment")
+                    if current_title and current_title not in ["Un instant…", "Just a moment", "Loading..."]:
+                        title = current_title
+                        print(f"Titre obtenu via browser en {time.time() - start:.2f} secondes")
+                        break
+                
+                if not title or title in ["Un instant…", "Just a moment", "Loading..."]:
+                    print(f"Titre invalide obtenu : {title}, passage à requests")
+                    browser = None
+                    
             except Exception as e:
                 print(f"Erreur avec browser, retour à requests : {e}")
                 browser = None
