@@ -1,5 +1,5 @@
-# Utiliser l'image Python 3.10
-FROM python:3.10
+# Utiliser l'image Python 3.10 avec Debian 12 (Bookworm) où wkhtmltopdf est disponible
+FROM python:3.10-bookworm
 
 # Installer les dépendances système AVANT de copier les fichiers
 RUN apt-get update && \
