@@ -145,8 +145,7 @@
             modalContent.scrollTop = modalContent.scrollHeight;
 
             // S'assurer que la modal est visible
-            //var modal = document.getElementById('myModal');
-            modal.style.display = 'block';
+            modal.classList.add('show');
 
             // Masquer le message le plus ancien après l'ajout de 5 messages
             if (modalContent.children.length > 5) {
@@ -157,7 +156,7 @@
         // Console log pour vérifier la réception de la réponse côté client
         console.log('Réponse reçue du serveur :', data);
         var modal = document.getElementById('myModal');
-        modal.style.display = 'none';
+        modal.classList.remove('show');
         console.log('on ferme le modal');
 
         // Mise à jour du contenu de la page avec les données de la réponse
@@ -198,7 +197,7 @@
 
         // Fermer le modal lorsqu'on clique sur le bouton de fermeture
         closeBtn.onclick = function() {
-            modal.style.display = 'none';
+            modal.classList.remove('show');
         };
     socket.onAny((event, ...args) => {
              console.log('Reçu un événement :', event, 'avec des données :', args);
@@ -234,13 +233,13 @@
     // Fonction pour afficher la modal
     function showModal() {
         var modal = document.getElementById('myModal');
-        modal.style.display = 'block';
+        modal.classList.add('show');
     }
 
     // Fonction pour fermer la modal
     function closeModal() {
         var modal = document.getElementById('myModal');
-        modal.style.display = 'none';
+        modal.classList.remove('show');
     }
 
 });

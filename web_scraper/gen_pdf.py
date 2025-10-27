@@ -1,10 +1,24 @@
 import pdfkit
 from urllib.parse import urlparse
 import os
+import re
 
 from common.utils import send_message_to_client
+
+def remove_highlight_tags(html):
+    """Supprime les balises mark/highlight du HTML"""
+    # Enlever toutes les balises <mark> en gardant le contenu
+    html = re.sub(r'</?mark[^>]*>', '', html)
+    # Enlever les classes hlterms
+    html = re.sub(r'class="hlterms"', '', html)
+    return html
+
 def generate_pdf(socketio, app, html,url,session_id):
     send_message_to_client(socketio, app, 'on génére le PDF',session_id)
+    
+    # Enlever les balises de surlignement du HTML
+    html = remove_highlight_tags(html)
+    
     name = (lambda u: urlparse(u).path.split('/')[-1][:90])(url)
     send_message_to_client(socketio, app, name,session_id)
     # Options PDF avec spécification de la taille de police

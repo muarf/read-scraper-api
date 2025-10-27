@@ -22,7 +22,9 @@ from common.utils import file_exists, generate_id, set_user_cookies
 from flask_cors import CORS
 from common.utils import send_message_to_client
 from urllib.parse import urlparse
-app = Flask(__name__, static_folder='/app/static/', static_url_path='/static')
+static_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static')
+static_folder_path = os.path.abspath(static_folder_path)
+app = Flask(__name__, static_folder=static_folder_path, static_url_path='/static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(app, cors_allowed_origins="*", path='/socket.io')
