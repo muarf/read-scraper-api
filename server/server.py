@@ -12,7 +12,6 @@ from flask import Flask, render_template, request, jsonify, make_response, g
 from flask_socketio import SocketIO
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.service import Service
 from web_scraper.chrome_driver_login import login_to_target_site
 from web_scraper.chrome_driver_search import search_target_site
 from web_scraper.extract_title import extract_title
@@ -44,9 +43,6 @@ def handle_disconnect():
 
 # Configuration du navigateur
 chrome_path = '/usr/bin/google-chrome'
-chrome_driver_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'chromedriver_local')
-chrome_driver_path = os.path.abspath(chrome_driver_path)
-
 options = webdriver.ChromeOptions()
 options.binary_location = chrome_path
 if not debug:
@@ -60,8 +56,7 @@ global_browser = None
 def get_browser(session_id):
     global global_browser
     if global_browser is None:
-        service = Service(chrome_driver_path) if os.path.exists(chrome_driver_path) else None
-        global_browser = webdriver.Chrome(service=service, options=options) if service else webdriver.Chrome(options=options)
+        global_browser = webdriver.Chrome(options=options)
         send_message_to_client(socketio, app, f"On lance le navigateur ", session_id)
         login_to_target_site(socketio, app, global_browser, username, password, session_id)
     return global_browser
