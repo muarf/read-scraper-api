@@ -12,6 +12,7 @@ from flask import Flask, render_template, request, jsonify, make_response, g
 from flask_socketio import SocketIO
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.service import Service
 from web_scraper.chrome_driver_login import login_to_target_site
 from web_scraper.chrome_driver_search import search_target_site
 from web_scraper.extract_title import extract_title
@@ -41,6 +42,9 @@ def handle_disconnect():
 
 # Configuration du navigateur
 chrome_path = '/usr/bin/google-chrome'
+chrome_driver_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'chromedriver_local')
+chrome_driver_path = os.path.abspath(chrome_driver_path)
+
 options = webdriver.ChromeOptions()
 options.binary_location = chrome_path
 if not debug:
@@ -54,7 +58,8 @@ global_browser = None
 def get_browser(session_id):
     global global_browser
     if global_browser is None:
-        global_browser = webdriver.Chrome(options=options)
+        service = Service(chrome_driver_path) if os.path.exists(chrome_driver_path) else None
+        global_browser = webdriver.Chrome(service=service, options=options) if service else webdriver.Chrome(options=options)
         send_message_to_client(socketio, app, f"On lance le navigateur ", session_id)
         login_to_target_site(socketio, app, global_browser, username, password, session_id)
     return global_browser
@@ -92,7 +97,18 @@ def handle_form_submission(data, session_id=None,event_name=None):
     if url:
 
         send_message_to_client(socketio, app, f"URL reçue : {url}", session_id)
-        query, title = extract_title(url)
+        
+        # Initialiser le browser tôt pour extraire le titre
+        browser = get_browser(session_id)
+        
+        result = extract_title(url, browser)
+        if result is None:
+            send_message_to_client(socketio, app, f"Erreur : impossible d'extraire le titre de l'URL {url}", session_id)
+            response = make_response(render_template('index.html', title=None))
+            socketio.emit(event_name, {'error': f'Impossible de traiter l\'URL: {url}', 'termine': True})
+            return response
+        
+        query, title = result
         send_message_to_client(socketio, app, f"Titre extrait : {title}", session_id)
         query_ = query.replace(" ", "_");
         name = (lambda u: urlparse(u).path.split('/')[-1][:90])(query_)
@@ -109,7 +125,6 @@ def handle_form_submission(data, session_id=None,event_name=None):
             socketio.emit(event_name, {'article': html, 'title': title, 'pdf_link': link_pdf, 'percentage': percentage})
             response = make_response(render_template('index.html', article=html , results=results_data, title=title, link_pdf=link_pdf, percentage=percentage)) 
             return response
-        browser = get_browser(session_id)
         search_result = search_target_site(socketio, app, browser, query, title,session_id)
         if search_result is not None:
             _, results_data = search_result
