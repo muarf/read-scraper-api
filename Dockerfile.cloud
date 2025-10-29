@@ -1,0 +1,71 @@
+# Dockerfile optimisé pour Google Cloud Run
+FROM python:3.11-slim
+
+# Installer les dépendances système nécessaires
+RUN apt-get update && apt-get install -y \
+    # Chrome et ChromeDriver
+    chromium-driver \
+    wget \
+    gnupg \
+    # wkhtmltopdf pour génération PDF
+    wkhtmltopdf \
+    # PostgreSQL client pour Cloud SQL
+    libpq-dev \
+    gcc \
+    # Fonts pour PDF
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installer Google Chrome stable
+RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
+    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && \
+    apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
+
+# Créer utilisateur non-root pour plus de sécurité
+RUN useradd --create-home --shell /bin/bash scraper
+USER scraper
+
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier et installer les dépendances Python
+COPY --chown=scraper:scraper requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Copier le code source
+COPY --chown=scraper:scraper . .
+
+# Variables d'environnement pour Cloud Run
+ENV PYTHONPATH="${PYTHONPATH}:/app"
+ENV PATH="/home/scraper/.local/bin:$PATH"
+ENV GOOGLE_CLOUD_PROJECT=""
+ENV CLOUD_SQL_CONNECTION_NAME=""
+ENV DATABASE_URL=""
+ENV GCS_BUCKET_NAME="article-scraper-files"
+ENV K_SERVICE="scraper-api"
+
+# Créer répertoires nécessaires (temporaires seulement)
+RUN mkdir -p /tmp/scraper_logs /tmp/chrome_data
+
+# Health check pour Cloud Run
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:$PORT/health || exit 1
+
+# Exposer le port Cloud Run
+EXPOSE 8080
+
+# Commande de démarrage
+CMD ["python", "backend/main.py"]

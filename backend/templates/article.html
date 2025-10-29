@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ article.title or 'Article' }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .article-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e5e5;
+        }
+        .article-header h1 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .article-meta {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        .download-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            transition: background 0.3s;
+        }
+        .download-button:hover {
+            background: #2980b9;
+        }
+        .article-content {
+            line-height: 1.8;
+            color: #34495e;
+        }
+        .article-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="article-header">
+        <h1>{{ article.title or 'Article' }}</h1>
+        <div class="article-meta">
+            <span>Source: {{ article.site_source or 'Inconnue' }}</span>
+            <span style="margin-left: 20px;">Date: {{ article.scraped_at or article.created_at }}</span>
+        </div>
+        <a href="{{ article.pdf_path }}" class="download-button" download>
+            📥 Télécharger le PDF
+        </a>
+    </div>
+    
+    <div class="article-content">
+        {{ article.html_content|safe }}
+    </div>
+</body>
+</html>
+
+
+
+

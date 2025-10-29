@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Presse Scraper</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/admin/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Écran de login -->
+    <div id="loginScreen" class="login-screen" style="display: none;">
+        <div class="login-box">
+            <h1><i class="fas fa-shield-alt"></i> Admin Login</h1>
+            <input type="password" id="adminPassword" placeholder="Mot de passe admin" />
+            <button onclick="checkPassword()" class="btn btn-primary">
+                <i class="fas fa-lock"></i> Connexion
+            </button>
+            <p id="loginError" style="color: #e74c3c; display: none;">Mot de passe incorrect</p>
+        </div>
+    </div>
+
+    <div id="adminContainer" class="admin-container" style="display: none;">
+        <header>
+            <h1><i class="fas fa-shield-alt"></i> Admin Dashboard</h1>
+            <div class="nav-tabs">
+                <button class="tab-btn active" data-tab="stats">
+                    <i class="fas fa-chart-bar"></i> Statistiques
+                </button>
+                <button class="tab-btn" data-tab="articles">
+                    <i class="fas fa-newspaper"></i> Articles
+                </button>
+                <button class="tab-btn" data-tab="jobs">
+                    <i class="fas fa-tasks"></i> Jobs
+                </button>
+                <button class="tab-btn" data-tab="apikeys">
+                    <i class="fas fa-key"></i> API Keys
+                </button>
+                <button class="tab-btn" data-tab="settings">
+                    <i class="fas fa-cog"></i> Paramètres
+                </button>
+            </div>
+        </header>
+
+        <div class="content-area">
+            <!-- Onglet Statistiques -->
+            <div id="statsTab" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <i class="fas fa-newspaper"></i>
+                        <div class="stat-info">
+                            <h3 id="totalArticles">0</h3>
+                            <p>Articles scrapés</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-globe"></i>
+                        <div class="stat-info">
+                            <h3 id="uniqueSources">0</h3>
+                            <p>Sources uniques</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-clock"></i>
+                        <div class="stat-info">
+                            <h3 id="pendingJobs">0</h3>
+                            <p>Jobs en attente</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-spinner"></i>
+                        <div class="stat-info">
+                            <h3 id="processingJobs">0</h3>
+                            <p>Jobs en cours</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Onglet Articles -->
+            <div id="articlesTab" class="tab-content">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Titre</th>
+                                <th>Source</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="articlesTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Onglet Jobs -->
+            <div id="jobsTab" class="tab-content">
+                <div class="controls" style="margin-bottom: 20px;">
+                    <button onclick="stopQueue()" class="btn" style="background: #e74c3c;">
+                        <i class="fas fa-stop"></i> Arrêter la queue
+                    </button>
+                    <button onclick="startQueue()" class="btn" style="background: #27ae60;">
+                        <i class="fas fa-play"></i> Démarrer la queue
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Job ID</th>
+                                <th>URL</th>
+                                <th>Statut</th>
+                                <th>Créé le</th>
+                                <th>Terminé le</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Onglet API Keys -->
+            <div id="apikeysTab" class="tab-content">
+                <div class="controls">
+                    <button id="refreshApiKeysBtn" class="btn btn-secondary" style="margin-right: 10px;">
+                        <i class="fas fa-sync-alt"></i> Actualiser
+                    </button>
+                    <button id="createApiKeyBtn" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Créer une clé API
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Type</th>
+                                <th>Dernière utilisation</th>
+                                <th>Statut</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="apikeysTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Onglet Paramètres -->
+            <div id="settingsTab" class="tab-content">
+                <div class="settings-section">
+                    <h2><i class="fas fa-lock"></i> Changement de mot de passe admin</h2>
+                    <div class="settings-form">
+                        <label for="currentPassword">Mot de passe actuel:</label>
+                        <input type="password" id="currentPassword" placeholder="Entrez le mot de passe actuel" />
+                        
+                        <label for="newPassword">Nouveau mot de passe:</label>
+                        <input type="password" id="newPassword" placeholder="Minimum 6 caractères" />
+                        
+                        <label for="confirmPassword">Confirmer le nouveau mot de passe:</label>
+                        <input type="password" id="confirmPassword" placeholder="Répétez le mot de passe" />
+                        
+                        <button onclick="changePassword()" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Changer le mot de passe
+                        </button>
+                        <p id="passwordMessage" style="margin-top: 20px;"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '8a2hL:9o*.g8&*>;^2GP5Q;tT~-n]^Nl';
+        const API_BASE = 'http://localhost:5000/api/v1';
+        
+        // Vérifier si l'utilisateur est déjà connecté
+        if (!sessionStorage.getItem('adminLoggedIn')) {
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('adminContainer').style.display = 'none';
+        } else {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('adminContainer').style.display = 'block';
+        }
+        
+        async function checkPassword() {
+            const password = document.getElementById('adminPassword').value;
+            const error = document.getElementById('loginError');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/check-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.valid) {
+                    sessionStorage.setItem('adminLoggedIn', 'true');
+                    document.getElementById('loginScreen').style.display = 'none';
+                    document.getElementById('adminContainer').style.display = 'block';
+                    error.style.display = 'none';
+                } else {
+                    error.style.display = 'block';
+                    document.getElementById('adminPassword').value = '';
+                }
+            } catch (error) {
+                console.error('Erreur vérification mot de passe:', error);
+                error.style.display = 'block';
+                document.getElementById('adminPassword').value = '';
+            }
+        }
+        
+        // Entrée pour se connecter
+        document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                checkPassword();
+            }
+        });
+
+        // Navigation par onglets
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`${tabId}Tab`).classList.add('active');
+                
+                if (tabId === 'stats') loadStats();
+                else if (tabId === 'articles') loadArticles();
+                else if (tabId === 'jobs') loadJobs();
+                else if (tabId === 'apikeys') loadApiKeys();
+                else if (tabId === 'settings') resetPasswordForm();
+            });
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/stats`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur HTTP stats:', response.status, response.statusText);
+                    return;
+                }
+
+                const stats = await response.json();
+
+                document.getElementById('totalArticles').textContent = stats.total_articles || 0;
+                document.getElementById('uniqueSources').textContent = stats.unique_sources || 0;
+                document.getElementById('pendingJobs').textContent = stats.pending_jobs || 0;
+                document.getElementById('processingJobs').textContent = stats.processing_jobs || 0;
+            } catch (error) {
+                console.error('Erreur chargement stats:', error);
+            }
+        }
+
+        async function loadArticles() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/articles`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur HTTP articles:', response.status, response.statusText);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!data || !data.articles) {
+                    console.error('Erreur: données articles invalides', data);
+                    return;
+                }
+
+                const tbody = document.getElementById('articlesTableBody');
+                tbody.innerHTML = '';
+
+                data.articles.forEach(article => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${article.title || 'Sans titre'}</td>
+                        <td>${article.site_source || '-'}</td>
+                        <td>${new Date(article.created_at).toLocaleString()}</td>
+                        <td>
+                            <button class="btn-icon" data-article-id="${article.id.replace(/"/g, '&quot;')}" onclick="deleteArticle(this)" title="Supprimer">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <a href="/api/v1/article/${article.id.replace(/"/g, '&quot;')}/pdf" class="btn-icon" download title="Télécharger PDF">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </td>
+                    `;
+                });
+            } catch (error) {
+                console.error('Erreur chargement articles:', error);
+            }
+        }
+
+        async function loadJobs() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/jobs`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur HTTP jobs:', response.status, response.statusText);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!data || !data.jobs) {
+                    console.error('Erreur: données jobs invalides', data);
+                    return;
+                }
+
+                const tbody = document.getElementById('jobsTableBody');
+                tbody.innerHTML = '';
+
+                data.jobs.forEach(job => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${job.id}</td>
+                        <td>${job.url.substring(0, 50)}...</td>
+                        <td><span class="badge badge-${job.status}">${job.status}</span></td>
+                        <td>${new Date(job.created_at).toLocaleString()}</td>
+                        <td>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}</td>
+                        <td>
+                            ${job.status === 'failed' ? `
+                            <button class="btn-icon" data-job-id="${job.id.replace(/"/g, '&quot;')}" onclick="retryJob(this)" title="Relancer le job" style="background: #f39c12;">
+                                <i class="fas fa-redo"></i>
+                            </button>
+                            ` : ''}
+                        </td>
+                    `;
+                });
+            } catch (error) {
+                console.error('Erreur chargement jobs:', error);
+            }
+        }
+
+        async function loadApiKeys() {
+            console.log('loadApiKeys appelée');
+            try {
+                const response = await fetch(`${API_BASE}/admin/apikeys`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur HTTP API keys:', response.status, response.statusText);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (!data || !data.api_keys) {
+                    console.error('Erreur: données API keys invalides', data);
+                    return;
+                }
+
+                // Construction du HTML complet pour éviter les problèmes d'insertion
+                let html = '';
+                data.api_keys.forEach(key => {
+                    html += `
+                        <tr>
+                            <td>${key.name || 'N/A'}</td>
+                            <td>${key.is_admin ? '<span class="badge badge-admin">Admin</span>' : 'Standard'}</td>
+                            <td>${key.last_used ? new Date(key.last_used).toLocaleString() : 'Jamais'}</td>
+                            <td>${key.is_active ? '<span class="badge badge-active">Actif</span>' : '<span class="badge badge-inactive">Inactif</span>'}</td>
+                            <td>
+                                ${!key.is_active ? '' : `
+                                <button class="btn-icon" data-api-key-id="${(key.id || '').replace(/"/g, '&quot;')}" onclick="revokeApiKey(this)" title="Révoquer">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                                `}
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                const tbody = document.getElementById('apikeysTableBody');
+                if (tbody) {
+                    tbody.innerHTML = html;
+                }
+            } catch (error) {
+                console.error('Erreur chargement API keys:', error);
+            }
+        }
+
+        async function deleteArticle(buttonElement) {
+            const articleId = buttonElement.getAttribute('data-article-id');
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cet article ?')) return;
+
+            try {
+                const encodedId = encodeURIComponent(articleId);
+                await fetch(`${API_BASE}/admin/article/${encodedId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                loadArticles();
+            } catch (error) {
+                alert('Erreur lors de la suppression');
+            }
+        }
+
+        async function revokeApiKey(buttonElement) {
+            const apiKeyId = buttonElement.getAttribute('data-api-key-id');
+            if (!confirm('Êtes-vous sûr de vouloir révoquer cette clé API ?')) return;
+
+            try {
+                await fetch(`${API_BASE}/admin/apikeys/${encodeURIComponent(apiKeyId)}`, {
+                    method: 'DELETE',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                loadApiKeys();
+            } catch (error) {
+                alert('Erreur lors de la révocation');
+            }
+        }
+
+        async function retryJob(buttonElement) {
+            const jobId = buttonElement.getAttribute('data-job-id');
+            if (!confirm('Relancer ce job ?')) return;
+
+            try {
+                await fetch(`${API_BASE}/admin/job/${encodeURIComponent(jobId)}/retry`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                alert('Job relancé avec succès');
+                loadJobs();
+            } catch (error) {
+                alert('Erreur lors de la relance du job');
+            }
+        }
+
+        document.getElementById('refreshApiKeysBtn').addEventListener('click', async () => {
+            await loadApiKeys();
+        });
+
+        document.getElementById('createApiKeyBtn').addEventListener('click', async () => {
+            const name = prompt('Nom de la clé API:');
+            if (!name) return;
+            
+            const isAdmin = confirm('Cette clé sera-t-elle admin ?');
+            
+            try {
+                const response = await fetch(`${API_BASE}/admin/apikeys`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({ name, is_admin: isAdmin })
+                });
+                const data = await response.json();
+                
+                if (data.api_key) {
+                    console.log('Clé API créée:', data.api_key);
+                    showApiKeyModal(data.api_key);
+                    // Recharger les clés API automatiquement
+                    await loadApiKeys();
+                }
+            } catch (error) {
+                alert('Erreur lors de la création');
+            }
+        });
+
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const message = document.getElementById('passwordMessage');
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                message.textContent = 'Veuillez remplir tous les champs';
+                message.style.color = '#e74c3c';
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                message.textContent = 'Les nouveaux mots de passe ne correspondent pas';
+                message.style.color = '#e74c3c';
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                message.textContent = 'Le mot de passe doit contenir au moins 6 caractères';
+                message.style.color = '#e74c3c';
+                return;
+            }
+            
+            // Vérifier le mot de passe actuel
+            try {
+                const checkResponse = await fetch(`${API_BASE}/admin/check-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: currentPassword })
+                });
+                const checkData = await checkResponse.json();
+                
+                if (!checkData.valid) {
+                    message.textContent = 'Mot de passe actuel incorrect';
+                    message.style.color = '#e74c3c';
+                    return;
+                }
+                
+                // Changer le mot de passe
+                const changeResponse = await fetch(`${API_BASE}/admin/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ new_password: newPassword })
+                });
+                
+                const changeData = await changeResponse.json();
+                
+                if (changeData.message) {
+                    message.textContent = 'Mot de passe changé avec succès !';
+                    message.style.color = '#27ae60';
+                    resetPasswordForm();
+                } else {
+                    message.textContent = changeData.error || 'Erreur lors du changement';
+                    message.style.color = '#e74c3c';
+                }
+            } catch (error) {
+                message.textContent = 'Erreur: ' + error.message;
+                message.style.color = '#e74c3c';
+            }
+        }
+        
+        function resetPasswordForm() {
+            document.getElementById('currentPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            document.getElementById('passwordMessage').textContent = '';
+        }
+
+        async function stopQueue() {
+            if (!confirm('Arrêter le traitement de la queue ?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/admin/queue/stop`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                alert('Queue arrêtée');
+                loadJobs();
+            } catch (error) {
+                alert('Erreur lors de l\'arrêt');
+            }
+        }
+
+        async function startQueue() {
+            if (!confirm('Démarrer le traitement de la queue ?')) return;
+            
+            try {
+                await fetch(`${API_BASE}/admin/queue/start`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                alert('Queue démarrée');
+                loadJobs();
+            } catch (error) {
+                alert('Erreur lors du démarrage');
+            }
+        }
+
+        // Modal pour afficher la clé API
+        function showApiKeyModal(apiKey) {
+            // Créer la modal si elle n'existe pas
+            let modal = document.getElementById('apiKeyModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'apiKeyModal';
+                modal.innerHTML = `
+                    <div id="apiKeyModalOverlay" style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                    ">
+                        <div style="
+                            background: white;
+                            padding: 20px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            max-width: 500px;
+                            width: 90%;
+                        ">
+                            <h3 style="margin-top: 0; color: #2c3e50;">🔑 Clé API créée avec succès</h3>
+                            <p style="color: #e74c3c; font-weight: bold; margin-bottom: 15px;">
+                                ⚠️ Sauvegardez cette clé immédiatement !
+                            </p>
+                            <p style="margin-bottom: 15px;">
+                                Cette clé ne sera plus affichée et ne peut pas être récupérée.
+                            </p>
+                            <div style="
+                                background: #f8f9fa;
+                                border: 1px solid #dee2e6;
+                                border-radius: 4px;
+                                padding: 10px;
+                                margin-bottom: 15px;
+                                font-family: monospace;
+                                font-size: 14px;
+                                word-break: break-all;
+                                cursor: text;
+                                user-select: text;
+                            " id="apiKeyDisplay">${apiKey}</div>
+                            <div style="text-align: center;">
+                                <button id="copyApiKeyBtn" style="
+                                    background: #3498db;
+                                    color: white;
+                                    border: none;
+                                    padding: 8px 16px;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                    margin-right: 10px;
+                                ">📋 Copier</button>
+                                <button id="closeApiKeyModal" style="
+                                    background: #95a5a6;
+                                    color: white;
+                                    border: none;
+                                    padding: 8px 16px;
+                                    border-radius: 4px;
+                                    cursor: pointer;
+                                ">Fermer</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            // Afficher la modal
+            modal.style.display = 'block';
+
+            // Gestionnaire pour copier
+            document.getElementById('copyApiKeyBtn').onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(apiKey);
+                    const btn = document.getElementById('copyApiKeyBtn');
+                    btn.textContent = '✅ Copié !';
+                    btn.style.background = '#27ae60';
+                    setTimeout(() => {
+                        btn.textContent = '📋 Copier';
+                        btn.style.background = '#3498db';
+                    }, 2000);
+                } catch (err) {
+                    // Fallback pour les navigateurs qui ne supportent pas clipboard API
+                    const textArea = document.createElement('textarea');
+                    textArea.value = apiKey;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+
+                    const btn = document.getElementById('copyApiKeyBtn');
+                    btn.textContent = '✅ Copié !';
+                    btn.style.background = '#27ae60';
+                    setTimeout(() => {
+                        btn.textContent = '📋 Copier';
+                        btn.style.background = '#3498db';
+                    }, 2000);
+                }
+            };
+
+            // Gestionnaire pour fermer
+            document.getElementById('closeApiKeyModal').onclick = () => {
+                modal.style.display = 'none';
+            };
+
+            // Fermer en cliquant sur l'overlay
+            document.getElementById('apiKeyModalOverlay').onclick = (e) => {
+                if (e.target.id === 'apiKeyModalOverlay') {
+                    modal.style.display = 'none';
+                }
+            };
+        }
+
+        // Charger les stats au démarrage
+        loadStats();
+
+        // Charger aussi les clés API pour l'onglet actif
+        if (document.querySelector('.tab-btn.active')?.dataset.tab === 'apikeys') {
+            loadApiKeys();
+        }
+    </script>
+</body>
+</html>
+

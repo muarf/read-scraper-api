@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Scraper - Documentation</title>
+    <style>
+        body {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .endpoint {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+        }
+        .method {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #3498db;
+            color: white;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .method.get { background: #27ae60; }
+        .method.post { background: #e67e22; }
+        .method.delete { background: #e74c3c; }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 API Scraper - Documentation</h1>
+        
+        <div class="warning">
+            <strong>Important:</strong> Vous devez d'abord créer une clé API en visitant <a href="/init">/init</a>
+        </div>
+        
+        <h2>Configuration</h2>
+        <p>Toutes les requêtes API nécessitent un header <code>X-API-Key</code> contenant votre clé API.</p>
+        
+        <h2>Endpoints Publiques</h2>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/api/v1/scrape</code>
+            <p>Créer un nouveau job de scraping</p>
+            <pre>
+{
+    "url": "https://exemple.com/article"
+}
+
+Response:
+{
+    "job_id": "abc123...",
+    "status": "pending",
+    "url": "https://exemple.com/article"
+}</pre>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/job/{job_id}</code>
+            <p>Obtenir le statut d'un job</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/article/{article_id}</code>
+            <p>Obtenir un article par son ID</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/article/{article_id}/pdf</code>
+            <p>Télécharger le PDF d'un article</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/articles?limit=50&offset=0&search=...&site_source=...</code>
+            <p>Lister les articles avec pagination et filtres</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/search?q=query</code>
+            <p>Rechercher dans les articles</p>
+        </div>
+        
+        <h2>Endpoints Admin</h2>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/admin/stats</code>
+            <p>Obtenir les statistiques globales</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/admin/articles</code>
+            <p>Lister tous les articles (admin)</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <code>/api/v1/admin/article/{article_id}</code>
+            <p>Supprimer un article</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/admin/jobs</code>
+            <p>Lister tous les jobs</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/api/v1/admin/apikeys</code>
+            <p>Créer une nouvelle clé API</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method get">GET</span>
+            <code>/api/v1/admin/apikeys</code>
+            <p>Lister les clés API</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method delete">DELETE</span>
+            <code>/api/v1/admin/apikeys/{api_key_id}</code>
+            <p>Révoquer une clé API</p>
+        </div>
+        
+        <div class="endpoint">
+            <span class="method post">POST</span>
+            <code>/api/v1/admin/cleanup</code>
+            <p>Nettoyer les données anciennes</p>
+        </div>
+        
+        <h2>Flux complet</h2>
+        <ol>
+            <li>Créer un job avec <code>POST /api/v1/scrape</code></li>
+            <li>Polling sur <code>GET /api/v1/job/{job_id}</code> jusqu'à <code>status=completed</code></li>
+            <li>Récupérer l'<code>article_id</code> du job</li>
+            <li>Obtenir l'article avec <code>GET /api/v1/article/{article_id}</code></li>
+            <li>Télécharger le PDF avec <code>GET /api/v1/article/{article_id}/pdf</code></li>
+        </ol>
+    </div>
+</body>
+</html>
+
+
+
+

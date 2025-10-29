@@ -95,10 +95,25 @@ def search_target_site(socketio, app, driver, query, title,session_id):
                     formatted_date= result.find_element(By.CSS_SELECTOR, '[data-qa-itemtype="docDate"]').text
                     doc_date = formatted_date[:10]
 
+                    # Extraire la longueur de l'article (nombre de mots)
+                    try:
+                        length_element = result.find_element(By.CSS_SELECTOR, '[data-qa-itemtype="docWordCount"]')
+                        length_text = length_element.text
+                        # Extraire le nombre de mots (ex: "305 mots" -> 305, "1 063 mots" -> 1063)
+                        # Utiliser une regex pour extraire tous les chiffres
+                        import re
+                        numbers = re.findall(r'\d+', length_text.replace(' ', ''))
+                        doc_length = int(numbers[0]) if numbers else 0
+                    except Exception as e:
+                        print(f"Erreur extraction longueur: {e}, texte: '{length_text}'")
+                        # Si la longueur n'est pas disponible, estimer d'après le titre
+                        doc_length = len(doc_title.split()) * 10  # Estimation approximative
+
                     similarity_percentage = calculate_similarity(title, doc_title)
                     print("Logo Title:", logo_label)
                     print("Doc Title:", doc_title)
                     print("Doc Date:", doc_date)
+                    print("Longueur:", doc_length, "mots")
                     print("Similarité:", similarity_percentage)
                     print("-" * 50)
                     if logo_label != "Twitter":
@@ -107,7 +122,8 @@ def search_target_site(socketio, app, driver, query, title,session_id):
                             'logo': logo_label,
                             'title': doc_title,
                             'date': doc_date,
-                            'percentage': similarity_percentage
+                            'percentage': similarity_percentage,
+                            'length': doc_length
                         })
                         collected_results += 1
 

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presse Scraper - API</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 onclick="location.reload()" style="cursor: pointer;" title="Recharger la page"><i class="fas fa-newspaper"></i> Presse Scraper</h1>
+            <p>API Backend - Interface Utilisateur</p>
+        </header>
+
+        <div class="main-content">
+            <div class="search-section">
+                <div class="input-group">
+                    <input type="text" id="urlInput" placeholder="Collez l'URL de l'article à scraper..." />
+                    <button id="scrapeBtn">
+                        <i class="fas fa-magic"></i> Scraper
+                    </button>
+                </div>
+            </div>
+
+            <div id="statusSection" class="status-section" style="display: none;">
+                <div class="status-card">
+                    <div class="spinner"></div>
+                    <p id="statusText">Initialisation...</p>
+                </div>
+            </div>
+
+            <div id="resultSection" class="result-section" style="display: none;">
+                <div class="article-preview">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 id="articleTitle"></h2>
+                        <a id="pdfLinkTop" href="#" class="btn btn-primary" download>
+                            <i class="fas fa-download"></i> Télécharger le PDF
+                        </a>
+                    </div>
+                    <div id="articleContent"></div>
+                    <div class="actions">
+                        <a id="pdfLink" href="#" class="btn btn-primary" download>
+                            <i class="fas fa-download"></i> Télécharger le PDF
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historySection" class="history-section">
+                <h2><i class="fas fa-history"></i> Historique des articles</h2>
+                <div id="historyList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_KEY = '8a2hL:9o*.g8&*>;^2GP5Q;tT~-n]^Nl';
+        const API_BASE = 'http://localhost:5000/api/v1';
+
+        const statusSection = document.getElementById('statusSection');
+        const resultSection = document.getElementById('resultSection');
+        const statusText = document.getElementById('statusText');
+        const urlInput = document.getElementById('urlInput');
+        const scrapeBtn = document.getElementById('scrapeBtn');
+
+        scrapeBtn.addEventListener('click', handleScrape);
+
+        // Ajouter la fonctionnalité de touche Entrée
+        urlInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                handleScrape();
+            }
+        });
+
+        async function handleScrape() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Veuillez entrer une URL');
+                return;
+            }
+
+            try {
+                showStatus('Création du job de scraping...');
+                
+                const response = await fetch(`${API_BASE}/scrape`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.job_id) {
+                    showStatus('Job créé, traitement en cours...');
+                    pollJobStatus(data.job_id);
+                } else {
+                    throw new Error(data.message || 'Erreur lors de la création du job');
+                }
+            } catch (error) {
+                showStatus(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        async function pollJobStatus(jobId) {
+            const maxAttempts = 60;
+            let attempts = 0;
+
+            const poll = async () => {
+                try {
+                    // Encoder le jobId pour les caractères spéciaux dans l'URL
+                    const encodedJobId = encodeURIComponent(jobId);
+                    const response = await fetch(`${API_BASE}/job/${encodedJobId}`, {
+                        headers: { 'X-API-Key': API_KEY }
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    const data = await response.json();
+
+                    if (data.status === 'completed') {
+                        showStatus('Scraping terminé avec succès!');
+                        if (data.article_id) {
+                            loadArticle(data.article_id);
+                        }
+                    } else if (data.status === 'failed') {
+                        showStatus(`Échec: ${data.error_message || 'Erreur inconnue'}`, 'error');
+                    } else {
+                        showStatus(`Traitement en cours... (${data.status})`);
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(poll, 2000);
+                        } else {
+                            showStatus('Timeout: le traitement prend trop de temps', 'error');
+                        }
+                    }
+                } catch (error) {
+                    showStatus(`Erreur: ${error.message}`, 'error');
+                }
+            };
+
+            poll();
+        }
+
+        async function loadArticle(articleId) {
+            try {
+                // Encoder l'articleId pour les caractères spéciaux dans l'URL
+                const encodedArticleId = encodeURIComponent(articleId);
+                const response = await fetch(`${API_BASE}/article/${encodedArticleId}`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                const article = await response.json();
+
+                document.getElementById('articleTitle').textContent = article.title;
+                
+                // Supprimer les balises mark du HTML en gardant le contenu
+                let cleanHtml = article.html_content;
+                // Remplacer récursivement toutes les balises mark par leur contenu
+                while (cleanHtml.includes('<mark') || cleanHtml.includes('</mark>')) {
+                    cleanHtml = cleanHtml.replace(/<mark[^>]*>(.*?)<\/mark>/gs, '$1');
+                }
+                cleanHtml = cleanHtml.replace(/class="hlterms"/gi, ''); // Supprimer les classes hlterms
+                
+                document.getElementById('articleContent').innerHTML = cleanHtml;
+                
+                // Utiliser le chemin relatif du PDF depuis la BDD
+                const pdfPath = `/static/${article.pdf_path.split('/').pop()}`;
+                document.getElementById('pdfLink').href = pdfPath;
+                document.getElementById('pdfLinkTop').href = pdfPath;
+                
+                resultSection.style.display = 'block';
+                statusSection.style.display = 'none';
+
+            } catch (error) {
+                showStatus(`Erreur: ${error.message}`, 'error');
+            }
+        }
+
+        function addToHistory(article) {
+            const historyList = document.getElementById('historyList');
+            const item = document.createElement('div');
+            item.className = 'history-item';
+
+            // Créer les éléments de manière programmatique pour éviter les problèmes d'échappement
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'history-info';
+            infoDiv.style.cursor = 'pointer';
+            infoDiv.onclick = () => viewArticleFromHistory(article.id);
+
+            const titleH3 = document.createElement('h3');
+            titleH3.textContent = article.title;
+
+            const dateP = document.createElement('p');
+            dateP.textContent = new Date(article.created_at).toLocaleString();
+
+            infoDiv.appendChild(titleH3);
+            infoDiv.appendChild(dateP);
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = `/static/${article.pdf_path.split('/').pop()}`;
+            downloadLink.className = 'btn btn-sm';
+            downloadLink.download = true;
+
+            const downloadIcon = document.createElement('i');
+            downloadIcon.className = 'fas fa-download';
+            downloadLink.appendChild(downloadIcon);
+
+            item.appendChild(infoDiv);
+            item.appendChild(downloadLink);
+
+            historyList.insertBefore(item, historyList.firstChild);
+        }
+        
+        async function viewArticleFromHistory(articleId) {
+            await loadArticle(articleId);
+            // Scroll vers le résultat
+            document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showStatus(message, type = 'info') {
+            statusText.textContent = message;
+            statusSection.style.display = 'block';
+            
+            const statusCard = statusSection.querySelector('.status-card');
+            if (type === 'error') {
+                statusCard.style.borderColor = '#e74c3c';
+            } else {
+                statusCard.style.borderColor = '#3498db';
+            }
+        }
+
+        // Charger l'historique au démarrage
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/articles?limit=20`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                
+                if (!response.ok) {
+                    console.error('Erreur HTTP:', response.status, response.statusText);
+                    return;
+                }
+                
+                const data = await response.json();
+                
+                if (!data || !data.articles) {
+                    console.error('Erreur: données invalides', data);
+                    return;
+                }
+                
+                // L'API retourne du plus récent au plus ancien
+                // Avec insertBefore, on ajoute en premier donc les plus récents arrivent en bas
+                // Pour avoir le plus récent en haut, il faut inverser
+                data.articles.reverse().forEach(article => addToHistory(article));
+            } catch (error) {
+                console.error('Erreur chargement historique:', error);
+            }
+        }
+
+        loadHistory();
+    </script>
+</body>
+</html>
+

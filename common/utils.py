@@ -8,14 +8,22 @@ def generate_id(length):
     alphabet = [chr(i) for i in range(33, 126) if i != 92 and i != 96]
     user_id = ''.join(choice(alphabet) for _ in range(length))
     return user_id
-def send_message_to_client(socketio, app, message,session_id):
+def send_message_to_client(socketio, app, message, session_id):
     print(message)
-    event_name = f'server_message_{session_id}'
-    socketio.emit(event_name, {'message': message})
-    socketio.sleep(0)
+    # Gérer le cas où socketio est None (mode API sans WebSocket)
+    if socketio is not None:
+        event_name = f'server_message_{session_id}'
+        socketio.emit(event_name, {'message': message})
+        socketio.sleep(0)
 def file_exists(name):
-    file_path = os.path.join('static', f'{name}.html')
-    return os.path.exists(file_path)
+    import sys
+    from pathlib import Path
+    
+    # Calculer le chemin absolu depuis le répertoire racine du projet
+    project_root = Path(__file__).resolve().parent.parent
+    static_dir = project_root / 'static'
+    file_path = static_dir / f'{name}.html'
+    return file_path.exists()
 def set_user_cookies():
     user_id = generate_id(10)
     response = make_response(render_template('index.html'))  # Créer un objet de réponse Flask

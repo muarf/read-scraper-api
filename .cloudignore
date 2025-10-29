@@ -1,0 +1,54 @@
+# Fichiers à exclure du build Cloud Build
+.git/
+.github/
+.env
+.env.local
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Fichiers spécifiques au développement local
+chromedriver_local/
+downloads/
+static/*.html
+static/*.pdf
+backend/data/scraper.db
+logs/
+debug_apikeys.js
+test_*.py
+*_test.py
+tests/
+
+# Documentation et configuration locale
+README*.md
+*.sh
+!deploy_cloud.sh
+Dockerfile
+!Dockerfile.cloud
+docker-compose.yml
+
+# IDE et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
