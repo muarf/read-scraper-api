@@ -43,10 +43,25 @@ def search_target_site(socketio, app, driver, query, title,session_id):
         except TimeoutException as e:
             handle_error(driver, socketio, app, session_id, "Champ de recherche non trouvé sur la page", e)
             return None
+        # Nettoyer les termes de recherche pour éviter les erreurs d'encodage
+        clean_query = query.encode('utf-8', errors='replace').decode('utf-8')
+
         # Remplir le champ de mots clés
-        send_message_to_client(socketio, app,f"Recherche avec le mot clé : {query}",session_id)
+        send_message_to_client(socketio, app,f"Recherche avec le mot clé : {clean_query}",session_id)
+        print(f"SAISIE DES TERMES DE RECHERCHE: '{clean_query}'")
         keyword_field.clear()
-        keyword_field.send_keys(query)
+        keyword_field.send_keys(clean_query)
+
+        # Attendre un peu pour que les termes soient visibles
+        time.sleep(1)
+
+        # Screenshot après saisie des termes
+        try:
+            after_input_screenshot = f"/root/read-scraper-api/static/debug_after_input_{job_id}_{int(time.time())}.png"
+            driver.save_screenshot(after_input_screenshot)
+            print(f"Screenshot après saisie des termes: {after_input_screenshot}")
+        except Exception as ss_error:
+            print(f"Impossible de prendre screenshot après saisie: {ss_error}")
         
         # Sélectionner la date de début
         try:
@@ -110,8 +125,13 @@ def search_target_site(socketio, app, driver, query, title,session_id):
                         doc_length = len(doc_title.split()) * 10  # Estimation approximative
 
                     similarity_percentage = calculate_similarity(title, doc_title)
-                    print("Logo Title:", logo_label)
-                    print("Doc Title:", doc_title)
+
+                    # Gestion sécurisée des caractères Unicode pour l'affichage
+                    safe_logo = logo_label.encode('utf-8', errors='replace').decode('utf-8')
+                    safe_title = doc_title.encode('utf-8', errors='replace').decode('utf-8')
+
+                    print("Logo Title:", safe_logo)
+                    print("Doc Title:", safe_title)
                     print("Doc Date:", doc_date)
                     print("Longueur:", doc_length, "mots")
                     print("Similarité:", similarity_percentage)
@@ -154,5 +174,12 @@ def search_target_site(socketio, app, driver, query, title,session_id):
         driver.save_screenshot('ss.png')
         with open("page_source.html", "w", encoding="utf-8") as file:
             file.write(driver.page_source)
-        send_message_to_client(socketio, app,f"Une erreur s'est produite lors de la recherche : {e}", session_id)
+        # Gestion sécurisée des erreurs avec caractères Unicode - double protection
+        try:
+            error_message = str(e).encode('utf-8', errors='replace').decode('utf-8')
+            send_message_to_client(socketio, app,f"Une erreur s'est produite lors de la recherche : {error_message}", session_id)
+        except Exception as encoding_error:
+            # Si même l'encodage échoue, envoyer un message générique
+            print(f"Erreur d'encodage dans send_message_to_client: {encoding_error}")
+            send_message_to_client(socketio, app,"Une erreur d'encodage s'est produite lors de la recherche", session_id)
         return None

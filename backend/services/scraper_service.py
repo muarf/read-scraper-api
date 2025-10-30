@@ -3,6 +3,7 @@ Service de scraping intégrant le code existant
 """
 import os
 import sys
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 from backend.models.database import Database
@@ -32,9 +33,16 @@ class ScraperService:
         self.db = db
         self.pdf_service = pdf_service
         self.browser = None
-        self._init_browser()
-        # Se connecter au site après l'initialisation du navigateur
-        self._login()
+        # Initialisation lazy - seulement quand nécessaire
+        self._browser_initialized = False
+
+    def _ensure_browser(self):
+        """S'assurer que le navigateur est initialisé"""
+        if not self._browser_initialized:
+            logger.info("Initialisation lazy du navigateur")
+            self._init_browser()
+            self._login()
+            self._browser_initialized = True
 
     def remove_highlight_tags(self, html: str) -> str:
         """Supprime les balises mark/highlight du HTML tout en gardant le contenu"""
@@ -63,12 +71,20 @@ class ScraperService:
             logger.info(f"Chromedriver trouvé: {chromedriver_path}")
             service = Service(CHROMEDRIVER_PATH)
             
-            # NE PAS mettre headless pour voir ce qui se passe
+            # Mode headless activé pour éviter les problèmes d'affichage en environnement serveur
             if HEADLESS:
                 chrome_options.add_argument('--headless')
             chrome_options.add_argument('--window-size=1920x1080')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-web-security')
+            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+            chrome_options.add_argument('--disable-background-timer-throttling')
+            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+            chrome_options.add_argument('--disable-renderer-backgrounding')
+            chrome_options.add_argument('--remote-debugging-port=0')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-software-rasterizer')
             
             try:
                 self.browser = webdriver.Chrome(service=service, options=chrome_options)
@@ -78,11 +94,20 @@ class ScraperService:
                 raise
         else:
             # Fallback si chromedriver_local n'existe pas
+            # Mode headless activé pour éviter les problèmes d'affichage en environnement serveur
             if HEADLESS:
                 chrome_options.add_argument('--headless')
             chrome_options.add_argument('--window-size=1920x1080')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-web-security')
+            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+            chrome_options.add_argument('--disable-background-timer-throttling')
+            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+            chrome_options.add_argument('--disable-renderer-backgrounding')
+            chrome_options.add_argument('--remote-debugging-port=0')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-software-rasterizer')
             
             try:
                 self.browser = webdriver.Chrome(options=chrome_options)
@@ -127,6 +152,9 @@ class ScraperService:
         Returns:
             tuple: (article_id, article_data) ou None en cas d'erreur
         """
+        # S'assurer que le navigateur est initialisé
+        self._ensure_browser()
+
         try:
             logger.info(f"[{job_id}] === DÉBUT DU SCRAPING ===")
             logger.info(f"[{job_id}] URL: {url}")
@@ -146,11 +174,25 @@ class ScraperService:
                 logger.info(f"[{job_id}] Résultat extract_title avec navigateur: {result}")
 
             if result is None:
-                raise Exception(f"Impossible d'extraire le titre de l'URL {url}")
+                logger.error(f"[{job_id}] Impossible d'extraire le titre de l'URL {url} - site protégé par Cloudflare ou indisponible")
+                # Essayer une approche alternative : utiliser l'URL elle-même comme titre
+                parsed_url = urlparse(url)
+                fallback_title = parsed_url.path.strip('/').replace('-', ' ').replace('_', ' ').title()
+                if fallback_title and len(fallback_title) > 5:
+                    result = (fallback_title, fallback_title)
+                    logger.info(f"[{job_id}] Utilisation du titre de fallback depuis l'URL: {result}")
+                else:
+                    raise Exception(f"Impossible d'extraire le titre de l'URL {url} - protection anti-bot détectée")
 
             query, title = result
             logger.info(f"[{job_id}] Titre extrait: '{title}'")
             logger.info(f"[{job_id}] Query généré: '{query}'")
+
+            # Stocker les termes de recherche dans les données du job
+            self.db.update_job_data(job_id, {
+                'search_terms': query,
+                'extracted_title': title
+            })
 
             # Étape 2: Générer le nom du fichier à partir du query (titre nettoyé)
             logger.info(f"[{job_id}] === ÉTAPE 2: Génération du nom de fichier ===")
@@ -204,10 +246,35 @@ class ScraperService:
                 logger.info(f"[{job_id}] Navigateur initialisé pour recherche: {browser is not None}")
             else:
                 logger.info(f"[{job_id}] Réutilisation navigateur existant: {browser is not None}")
+            # Screenshot avant la recherche
+            try:
+                debug_screenshot_path = f"/root/read-scraper-api/static/debug_before_search_{job_id}_{int(time.time())}.png"
+                browser.save_screenshot(debug_screenshot_path)
+                logger.info(f"[{job_id}] Screenshot avant recherche: {debug_screenshot_path}")
+
+                # Mettre à jour les données du job avec l'étape actuelle
+                self.db.update_job_data(job_id, {
+                    'search_terms': query,
+                    'extracted_title': title,
+                    'current_step': 'searching',
+                    'step_description': 'Recherche d\'articles similaires en cours...'
+                })
+            except Exception as ss_error:
+                logger.warning(f"[{job_id}] Impossible de prendre screenshot avant recherche: {ss_error}")
+
+            logger.info(f"[{job_id}] ENVOI À LA RECHERCHE - Query: '{query}' (len={len(query)}), Title: '{title[:50]}...'")
             search_result = search_target_site(None, None, browser, query, title, job_id)
             logger.info(f"[{job_id}] Résultat recherche: {search_result}")
-            
+
             if search_result is None:
+                # Screenshot en cas d'échec de recherche
+                try:
+                    error_screenshot_path = f"/root/read-scraper-api/static/debug_search_failed_{job_id}_{int(time.time())}.png"
+                    browser.save_screenshot(error_screenshot_path)
+                    logger.info(f"[{job_id}] Screenshot d'échec de recherche: {error_screenshot_path}")
+                except Exception as ss_error:
+                    logger.warning(f"[{job_id}] Impossible de prendre screenshot d'échec: {ss_error}")
+
                 raise Exception("Aucun résultat trouvé pour cet article")
             
             _, results_data = search_result
@@ -258,8 +325,19 @@ class ScraperService:
             
             link = best_match['link']
             percentage = best_match['percentage']
-            
+
             logger.info(f"[{job_id}] Article trouvé avec probabilité {percentage}% - Site: {best_match.get('logo', 'inconnu')}")
+
+            # Mettre à jour l'étape avec les résultats de recherche
+            self.db.update_job_data(job_id, {
+                'search_terms': query,
+                'extracted_title': title,
+                'current_step': 'downloading',
+                'step_description': 'Téléchargement du contenu de l\'article...',
+                'article_title': best_match.get('title', ''),
+                'similarity_score': percentage,
+                'source_site': best_match.get('logo', 'inconnu')
+            })
             
             # Étape 4: Télécharger le contenu de l'article
             logger.info(f"[{job_id}] Téléchargement du contenu...")
@@ -275,6 +353,19 @@ class ScraperService:
 
             # Étape 5: Générer le PDF
             logger.info(f"[{job_id}] Génération du PDF...")
+
+            # Mettre à jour l'étape de génération PDF
+            self.db.update_job_data(job_id, {
+                'search_terms': query,
+                'extracted_title': title,
+                'current_step': 'generating_pdf',
+                'step_description': 'Génération du PDF en cours...',
+                'article_title': best_match.get('title', ''),
+                'similarity_score': percentage,
+                'source_site': best_match.get('logo', 'inconnu'),
+                'content_length': len(html_content)
+            })
+
             pdf_path, html_path = self.pdf_service.generate_pdf(html_content, query_, job_id)
             
             # Étape 6: Sauvegarder dans la BDD
@@ -305,7 +396,19 @@ class ScraperService:
             })
         
         except Exception as e:
-            logger.error(f"[{job_id}] Erreur scraping: {e}")
+            # Gestion sécurisée des erreurs avec caractères Unicode
+            error_message = str(e).encode('utf-8', errors='replace').decode('utf-8')
+            logger.error(f"[{job_id}] Erreur scraping: {error_message}")
+
+            # Prendre un screenshot en cas d'erreur pour le debug
+            try:
+                if self.browser:
+                    screenshot_path = f"/root/read-scraper-api/static/debug_screenshot_{job_id}_{int(time.time())}.png"
+                    self.browser.save_screenshot(screenshot_path)
+                    logger.info(f"[{job_id}] Screenshot d'erreur sauvegardé: {screenshot_path}")
+            except Exception as screenshot_error:
+                logger.warning(f"[{job_id}] Impossible de prendre le screenshot d'erreur: {screenshot_error}")
+
             raise
     
     def cleanup(self):

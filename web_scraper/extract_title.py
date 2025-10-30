@@ -23,25 +23,30 @@ def extract_title(url, browser=None, max_words=15):
             try:
                 browser.get(url)
                 # Attendre que la page charge et que le titre soit valide (pas la page anti-DDoS)
-                max_wait = 10  # Maximum 10 secondes
+                max_wait = 15  # Augmenter à 15 secondes pour les sites lents
                 wait_interval = 0.5  # Vérifier toutes les 0.5 secondes
                 elapsed = 0
-                
+
                 while elapsed < max_wait:
                     time.sleep(wait_interval)
                     elapsed += wait_interval
                     current_title = browser.title
-                    
-                    # Si le titre est valide (pas vide, pas "Un instant…", pas "Just a moment")
-                    if current_title and current_title not in ["Un instant…", "Just a moment", "Loading..."]:
+
+                    # Si le titre est valide (pas vide, pas de pages de protection)
+                    invalid_titles = ["Un instant…", "Just a moment", "Loading...", "Just a moment...",
+                                    "Please wait...", "Checking your browser...", "Verifying...",
+                                    "Cloudflare", "DDoS protection", "Security Check"]
+
+                    if current_title and not any(invalid in current_title for invalid in invalid_titles):
                         title = current_title
                         print(f"Titre obtenu via browser en {time.time() - start:.2f} secondes")
                         break
-                
-                if not title or title in ["Un instant…", "Just a moment", "Loading..."]:
-                    print(f"Titre invalide obtenu : {title}, passage à requests")
+
+                # Si le titre n'est toujours pas valide après l'attente, passer à requests
+                if not title:
+                    print(f"Titre invalide obtenu après {max_wait}s : {browser.title}, passage à requests")
                     browser = None
-                    
+
             except Exception as e:
                 print(f"Erreur avec browser, retour à requests : {e}")
                 browser = None
@@ -66,6 +71,23 @@ def extract_title(url, browser=None, max_words=15):
                 return None
 
         if not title:
+            print("Aucun titre valide trouvé après toutes les tentatives")
+            return None
+
+        # Vérifier que le titre extrait semble légitime (pas trop court, pas de protection)
+        if len(title.strip()) < 5:
+            print(f"Titre trop court : '{title}', considéré comme invalide")
+            return None
+
+        # Vérifier les patterns de protection Cloudflare courants
+        cloudflare_patterns = [
+            r'just a moment', r'checking your browser', r'please wait',
+            r'verifying', r'security check', r'cloudflare'
+        ]
+
+        title_lower = title.lower()
+        if any(pattern in title_lower for pattern in cloudflare_patterns):
+            print(f"Titre indique une protection Cloudflare : '{title}'")
             return None
 
         # Traitement du titre pour créer la requête

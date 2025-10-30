@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presse Scraper - API</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/frontend/style.css">
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -49,6 +49,58 @@
                 </div>
             </div>
 
+            <div id="debugSection" class="debug-section" style="display: none;">
+                <h2><i class="fas fa-bug"></i> Debug Console</h2>
+                <div class="debug-controls">
+                    <button id="toggleDebugBtn" class="btn btn-sm">
+                        <i class="fas fa-eye"></i> Afficher/Cacher Debug
+                    </button>
+                    <button id="clearDebugBtn" class="btn btn-sm">
+                        <i class="fas fa-trash"></i> Vider
+                    </button>
+                    <button id="loadScreenshotsBtn" class="btn btn-sm">
+                        <i class="fas fa-camera"></i> Screenshots
+                    </button>
+                </div>
+
+                <!-- Indicateur d'étape actuelle -->
+                <div id="currentStepIndicator" class="current-step-indicator" style="display: none;">
+                    <div class="current-step">
+                        <h3>Étape actuelle: Initialisation</h3>
+                        <p>En attente de démarrage du scraping...</p>
+                    </div>
+                </div>
+
+                <div id="debugConsole" class="debug-console"></div>
+                <div id="screenshotsContainer" class="screenshots-container" style="display: none;">
+                    <h3>Screenshots de Debug</h3>
+                    <div id="screenshotsList" class="screenshots-list"></div>
+                </div>
+            </div>
+
+            <!-- Modal pour afficher les screenshots en grand -->
+            <div id="screenshotModal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <span class="close-modal" id="closeModal">&times;</span>
+                    <div class="modal-header">
+                        <h2 id="modalTitle">Screenshot</h2>
+                        <div class="modal-info">
+                            <span id="modalType"></span> |
+                            <span id="modalJobId"></span> |
+                            <span id="modalDate"></span>
+                        </div>
+                    </div>
+                    <div class="modal-body">
+                        <img id="modalImage" src="" alt="Screenshot" />
+                    </div>
+                    <div class="modal-footer">
+                        <button id="prevScreenshot" class="btn btn-sm">← Précédent</button>
+                        <span id="screenshotCounter">1 / 1</span>
+                        <button id="nextScreenshot" class="btn btn-sm">Suivant →</button>
+                    </div>
+                </div>
+            </div>
+
             <div id="historySection" class="history-section">
                 <h2><i class="fas fa-history"></i> Historique des articles</h2>
                 <div id="historyList"></div>
@@ -57,8 +109,186 @@
     </div>
 
     <script>
-        const API_KEY = '8a2hL:9o*.g8&*>;^2GP5Q;tT~-n]^Nl';
-        const API_BASE = 'http://localhost:5000/api/v1';
+        const API_KEY = 'VN7hVSfWe2?aQ}dxIb$k!/%jDRrBP59v';
+        // Détecter dynamiquement l'URL de base
+        const API_BASE = window.location.protocol + '//' + window.location.host + '/api/v1';
+
+        // Debug mode - activé automatiquement
+        const DEBUG_MODE = true;
+        let debugVisible = false;
+
+        function debugLog(message, data = null) {
+            if (DEBUG_MODE) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}`;
+                console.log(logMessage, data || '');
+
+                // Ajouter aussi dans la console HTML
+                addToDebugConsole(logMessage, data);
+            }
+        }
+
+        function addToDebugConsole(message, data = null) {
+            const debugConsole = document.getElementById('debugConsole');
+            if (debugConsole) {
+                const logEntry = document.createElement('div');
+                logEntry.className = 'debug-entry';
+
+                const messageSpan = document.createElement('span');
+                messageSpan.className = 'debug-message';
+                messageSpan.textContent = message;
+
+                logEntry.appendChild(messageSpan);
+
+                if (data) {
+                    const dataSpan = document.createElement('span');
+                    dataSpan.className = 'debug-data';
+                    dataSpan.textContent = JSON.stringify(data, null, 2);
+                    logEntry.appendChild(dataSpan);
+                }
+
+                debugConsole.appendChild(logEntry);
+                debugConsole.scrollTop = debugConsole.scrollHeight; // Auto-scroll
+            }
+        }
+
+        function toggleDebugPanel() {
+            const debugSection = document.getElementById('debugSection');
+            debugVisible = !debugVisible;
+            debugSection.style.display = debugVisible ? 'block' : 'none';
+
+            const toggleBtn = document.getElementById('toggleDebugBtn');
+            toggleBtn.innerHTML = debugVisible ?
+                '<i class="fas fa-eye-slash"></i> Cacher Debug' :
+                '<i class="fas fa-eye"></i> Afficher Debug';
+        }
+
+        function clearDebugConsole() {
+            const debugConsole = document.getElementById('debugConsole');
+            debugConsole.innerHTML = '';
+        }
+
+        async function loadDebugScreenshots() {
+            debugLog('Chargement des screenshots de debug...');
+
+            try {
+                const response = await fetch(`${API_BASE}/debug/screenshots`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                debugLog('Screenshots chargés', { total: data.total });
+
+                displayScreenshots(data.screenshots);
+
+            } catch (error) {
+                debugLog('Erreur chargement screenshots', error);
+                console.error('Erreur chargement screenshots:', error);
+            }
+        }
+
+        function displayScreenshots(screenshots) {
+            const container = document.getElementById('screenshotsContainer');
+            const list = document.getElementById('screenshotsList');
+
+            if (screenshots.length === 0) {
+                list.innerHTML = '<p style="color: #95a5a6;">Aucun screenshot de debug disponible</p>';
+                container.style.display = 'block';
+                return;
+            }
+
+            // Trier par date décroissante (plus récent en premier)
+            screenshots.sort((a, b) => new Date(b.datetime) - new Date(a.datetime));
+
+            // Stocker les screenshots pour le modal
+            currentScreenshots = screenshots;
+
+            list.innerHTML = '';
+
+            screenshots.forEach((screenshot, index) => {
+                const item = document.createElement('div');
+                item.className = 'screenshot-item';
+
+                const img = document.createElement('img');
+                img.src = screenshot.url;
+                img.alt = screenshot.filename;
+                img.style.maxWidth = '200px';
+                img.style.maxHeight = '150px';
+                img.style.border = '1px solid #34495e';
+                img.style.borderRadius = '5px';
+                img.style.marginBottom = '10px';
+                img.style.cursor = 'pointer';
+                img.title = 'Cliquer pour agrandir';
+
+                // Rendre l'image cliquable pour ouvrir le modal
+                img.onclick = () => openScreenshotModal(index);
+
+                const info = document.createElement('div');
+                info.className = 'screenshot-info';
+                const typeLabels = {
+                    'before_search': 'Avant recherche',
+                    'search_failed': 'Échec recherche',
+                    'screenshot': 'Screenshot final'
+                };
+
+                info.innerHTML = `
+                    <strong>${typeLabels[screenshot.type] || screenshot.type}</strong><br>
+                    Job: ${screenshot.job_id}<br>
+                    ${new Date(screenshot.datetime).toLocaleString()}<br>
+                    ${(screenshot.size / 1024).toFixed(1)} KB
+                `;
+
+                item.appendChild(img);
+                item.appendChild(info);
+                list.appendChild(item);
+            });
+
+            container.style.display = 'block';
+        }
+
+        function openScreenshotModal(index) {
+            currentModalIndex = index;
+            const screenshot = currentScreenshots[index];
+            const modal = document.getElementById('screenshotModal');
+
+            // Mettre à jour le contenu du modal
+            document.getElementById('modalTitle').textContent = `Screenshot - ${screenshot.type}`;
+            document.getElementById('modalType').textContent = screenshot.type;
+            document.getElementById('modalJobId').textContent = `Job: ${screenshot.job_id}`;
+            document.getElementById('modalDate').textContent = new Date(screenshot.datetime).toLocaleString();
+            document.getElementById('modalImage').src = screenshot.url;
+
+            // Mettre à jour le compteur
+            updateModalCounter();
+
+            // Afficher le modal
+            modal.style.display = 'block';
+        }
+
+        function updateModalCounter() {
+            const counter = document.getElementById('screenshotCounter');
+            counter.textContent = `${currentModalIndex + 1} / ${currentScreenshots.length}`;
+
+            // Activer/désactiver les boutons de navigation
+            document.getElementById('prevScreenshot').disabled = currentModalIndex === 0;
+            document.getElementById('nextScreenshot').disabled = currentModalIndex === currentScreenshots.length - 1;
+        }
+
+        function closeModal() {
+            document.getElementById('screenshotModal').style.display = 'none';
+        }
+
+        function navigateScreenshot(direction) {
+            currentModalIndex += direction;
+            if (currentModalIndex < 0) currentModalIndex = 0;
+            if (currentModalIndex >= currentScreenshots.length) currentModalIndex = currentScreenshots.length - 1;
+
+            openScreenshotModal(currentModalIndex);
+        }
 
         const statusSection = document.getElementById('statusSection');
         const resultSection = document.getElementById('resultSection');
@@ -75,114 +305,298 @@
             }
         });
 
+        // Initialiser le panneau de debug
+        document.getElementById('toggleDebugBtn').addEventListener('click', toggleDebugPanel);
+        document.getElementById('clearDebugBtn').addEventListener('click', clearDebugConsole);
+        document.getElementById('loadScreenshotsBtn').addEventListener('click', loadDebugScreenshots);
+
+        // Initialiser le modal
+        document.getElementById('closeModal').addEventListener('click', closeModal);
+        document.getElementById('prevScreenshot').addEventListener('click', () => navigateScreenshot(-1));
+        document.getElementById('nextScreenshot').addEventListener('click', () => navigateScreenshot(1));
+
+        // Fermer le modal en cliquant en dehors
+        document.getElementById('screenshotModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('screenshotModal')) {
+                closeModal();
+            }
+        });
+
+        // Afficher le panneau de debug par défaut pour les développeurs
+        if (DEBUG_MODE) {
+            document.getElementById('debugSection').style.display = 'block';
+            debugVisible = true;
+            document.getElementById('toggleDebugBtn').innerHTML = '<i class="fas fa-eye-slash"></i> Cacher Debug';
+        }
+
+        debugLog('Application initialisée', {
+            apiBase: API_BASE,
+            debugMode: DEBUG_MODE,
+            userAgent: navigator.userAgent
+        });
+
         async function handleScrape() {
             const url = urlInput.value.trim();
+            debugLog('Début du scraping', { url });
+
             if (!url) {
+                debugLog('URL vide détectée');
                 alert('Veuillez entrer une URL');
                 return;
             }
 
             try {
+                debugLog('Création du job de scraping...');
                 showStatus('Création du job de scraping...');
-                
+
+                // Afficher l'indicateur d'étape
+                document.getElementById('currentStepIndicator').style.display = 'block';
+
+                const requestData = { url };
+                debugLog('Données de requête', requestData);
+
                 const response = await fetch(`${API_BASE}/scrape`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-API-Key': API_KEY
                     },
-                    body: JSON.stringify({ url })
+                    body: JSON.stringify(requestData)
+                });
+
+                debugLog('Réponse reçue', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    const errorText = await response.text();
+                    debugLog('Erreur HTTP détaillée', errorText);
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
                 }
 
                 const data = await response.json();
-                
+                debugLog('Données de réponse', data);
+
                 if (data.job_id) {
+                    debugLog('Job créé avec succès', { jobId: data.job_id });
                     showStatus('Job créé, traitement en cours...');
                     pollJobStatus(data.job_id);
                 } else {
+                    debugLog('Pas de job_id dans la réponse', data);
                     throw new Error(data.message || 'Erreur lors de la création du job');
                 }
             } catch (error) {
+                debugLog('Erreur dans handleScrape', error);
                 showStatus(`Erreur: ${error.message}`, 'error');
             }
         }
 
-        async function pollJobStatus(jobId) {
-            const maxAttempts = 60;
+        let currentJobId = null;
+        let lastScreenshotCount = 0;
+        let currentScreenshots = [];
+        let currentModalIndex = 0;
+
+        function pollJobStatus(jobId) {
+            const maxAttempts = 30; // Réduit de 60 à 30 (60 secondes max au lieu de 120)
             let attempts = 0;
+            const startTime = Date.now();
+            currentJobId = jobId;
+
+            debugLog('Début du polling du job', { jobId, maxAttempts, intervalSeconds: 3 });
 
             const poll = async () => {
+                attempts++;
+                const elapsed = Math.round((Date.now() - startTime) / 1000);
+
                 try {
+                    debugLog(`Polling attempt ${attempts}/${maxAttempts} (elapsed: ${elapsed}s)`);
+
                     // Encoder le jobId pour les caractères spéciaux dans l'URL
                     const encodedJobId = encodeURIComponent(jobId);
-                    const response = await fetch(`${API_BASE}/job/${encodedJobId}`, {
+                    const pollUrl = `${API_BASE}/job/${encodedJobId}`;
+                    debugLog('URL de polling', pollUrl);
+
+                    const response = await fetch(pollUrl, {
                         headers: { 'X-API-Key': API_KEY }
                     });
-                    
+
+                    debugLog('Réponse de polling reçue', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        ok: response.ok
+                    });
+
                     if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        const errorText = await response.text();
+                        debugLog('Erreur HTTP dans polling', errorText);
+                        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
                     }
-                    
+
                     const data = await response.json();
+                    debugLog('Données du job', data);
+
+                    // Mettre à jour l'étape actuelle
+                    updateCurrentStep(data);
+
+                    // Mettre à jour les screenshots en temps réel
+                    await updateScreenshotsInRealTime(jobId);
 
                     if (data.status === 'completed') {
-                        showStatus('Scraping terminé avec succès!');
+                        debugLog('Job terminé avec succès', { articleId: data.article_id });
+                        showStatus('✅ Scraping terminé avec succès!');
                         if (data.article_id) {
                             loadArticle(data.article_id);
                         }
+                        currentJobId = null;
+                        // Masquer l'indicateur d'étape après un délai
+                        setTimeout(() => {
+                            document.getElementById('currentStepIndicator').style.display = 'none';
+                        }, 3000);
                     } else if (data.status === 'failed') {
-                        showStatus(`Échec: ${data.error_message || 'Erreur inconnue'}`, 'error');
+                        debugLog('Job échoué', { errorMessage: data.error_message });
+                        showStatus(`❌ Échec: ${data.error_message || 'Erreur inconnue'}`, 'error');
+                        currentJobId = null;
+                        // Masquer l'indicateur d'étape
+                        document.getElementById('currentStepIndicator').style.display = 'none';
                     } else {
-                        showStatus(`Traitement en cours... (${data.status})`);
+                        const statusMsg = `🔄 Traitement en cours... (${getReadableStatus(data.status)}) - ${elapsed}s écoulé`;
+                        debugLog('Job en cours', { status: data.status, attempts, elapsed });
+                        showStatus(statusMsg);
                         attempts++;
                         if (attempts < maxAttempts) {
-                            setTimeout(poll, 2000);
+                            setTimeout(poll, 3000); // Augmenté de 2s à 3s pour moins de requêtes
                         } else {
-                            showStatus('Timeout: le traitement prend trop de temps', 'error');
+                            debugLog('Timeout atteint', { maxAttempts, elapsed });
+                            showStatus('⏰ Timeout: le traitement prend trop de temps', 'error');
+                            currentJobId = null;
                         }
                     }
                 } catch (error) {
-                    showStatus(`Erreur: ${error.message}`, 'error');
+                    debugLog('Erreur dans polling', error);
+                    showStatus(`❌ Erreur: ${error.message}`, 'error');
+                    currentJobId = null;
                 }
             };
 
             poll();
         }
 
+        function getReadableStatus(status) {
+            const statusMap = {
+                'pending': 'En attente',
+                'processing': 'Traitement',
+                'searching': 'Recherche en cours',
+                'downloading': 'Téléchargement',
+                'generating_pdf': 'Génération PDF',
+                'completed': 'Terminé',
+                'failed': 'Échec'
+            };
+            return statusMap[status] || status;
+        }
+
+        function updateCurrentStep(jobData) {
+            const stepIndicator = document.getElementById('currentStepIndicator');
+            if (stepIndicator) {
+                const status = getReadableStatus(jobData.status);
+                const searchTerms = jobData.search_terms || 'N/A';
+
+                stepIndicator.innerHTML = `
+                    <div class="current-step">
+                        <h3>Étape actuelle: ${status}</h3>
+                        <p><strong>Termes de recherche:</strong> ${searchTerms}</p>
+                        ${jobData.article_title ? `<p><strong>Titre trouvé:</strong> ${jobData.article_title.substring(0, 100)}...</p>` : ''}
+                        ${jobData.similarity_score ? `<p><strong>Similarité:</strong> ${jobData.similarity_score}%</p>` : ''}
+                    </div>
+                `;
+            }
+        }
+
+        async function updateScreenshotsInRealTime(jobId) {
+            try {
+                const response = await fetch(`${API_BASE}/debug/screenshots`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const jobScreenshots = data.screenshots.filter(s => s.job_id === jobId);
+
+                    if (jobScreenshots.length > lastScreenshotCount) {
+                        debugLog(`Nouveaux screenshots détectés: ${jobScreenshots.length} (était ${lastScreenshotCount})`);
+                        lastScreenshotCount = jobScreenshots.length;
+                        displayScreenshots(jobScreenshots);
+                    }
+                }
+            } catch (error) {
+                debugLog('Erreur mise à jour screenshots temps réel', error);
+            }
+        }
+
         async function loadArticle(articleId) {
+            debugLog('Chargement de l\'article', { articleId });
+
             try {
                 // Encoder l'articleId pour les caractères spéciaux dans l'URL
                 const encodedArticleId = encodeURIComponent(articleId);
-                const response = await fetch(`${API_BASE}/article/${encodedArticleId}`, {
+                const articleUrl = `${API_BASE}/article/${encodedArticleId}`;
+                debugLog('URL de l\'article', articleUrl);
+
+                const response = await fetch(articleUrl, {
                     headers: { 'X-API-Key': API_KEY }
                 });
+
+                debugLog('Réponse de chargement d\'article', {
+                    status: response.status,
+                    ok: response.ok
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
                 const article = await response.json();
+                debugLog('Article chargé', {
+                    title: article.title,
+                    hasContent: !!article.html_content,
+                    hasPdfPath: !!article.pdf_path
+                });
 
                 document.getElementById('articleTitle').textContent = article.title;
-                
+
                 // Supprimer les balises mark du HTML en gardant le contenu
                 let cleanHtml = article.html_content;
+                const originalLength = cleanHtml.length;
+
                 // Remplacer récursivement toutes les balises mark par leur contenu
                 while (cleanHtml.includes('<mark') || cleanHtml.includes('</mark>')) {
                     cleanHtml = cleanHtml.replace(/<mark[^>]*>(.*?)<\/mark>/gs, '$1');
                 }
                 cleanHtml = cleanHtml.replace(/class="hlterms"/gi, ''); // Supprimer les classes hlterms
-                
+
+                debugLog('Nettoyage HTML', {
+                    originalLength,
+                    cleanedLength: cleanHtml.length,
+                    removed: originalLength - cleanHtml.length
+                });
+
                 document.getElementById('articleContent').innerHTML = cleanHtml;
-                
+
                 // Utiliser le chemin relatif du PDF depuis la BDD
                 const pdfPath = `/static/${article.pdf_path.split('/').pop()}`;
+                debugLog('Chemin PDF', { original: article.pdf_path, final: pdfPath });
+
                 document.getElementById('pdfLink').href = pdfPath;
                 document.getElementById('pdfLinkTop').href = pdfPath;
-                
+
                 resultSection.style.display = 'block';
                 statusSection.style.display = 'none';
 
+                debugLog('Article affiché avec succès');
+
             } catch (error) {
+                debugLog('Erreur dans loadArticle', error);
                 showStatus(`Erreur: ${error.message}`, 'error');
             }
         }

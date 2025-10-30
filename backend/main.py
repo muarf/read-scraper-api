@@ -50,20 +50,19 @@ global_scraper = None
 
 def scraper_callback(url: str, job_id: str):
     """Callback pour le service de scraping"""
-    global global_scraper
-
-    if global_scraper is None:
-        global_scraper = ScraperService(db, pdf_service)
-        logger.info("Nouvelle instance globale de scraper créée")
+    # Créer une nouvelle instance pour chaque job afin d'éviter les conflits de session Chrome
+    scraper = ScraperService(db, pdf_service)
+    logger.info(f"Nouvelle instance de scraper créée pour job {job_id}")
 
     try:
-        return global_scraper.scrape_article(url, job_id)
+        return scraper.scrape_article(url, job_id)
     except Exception as e:
-        logger.error(f"Erreur dans scraper_callback, nettoyage: {e}")
-        # En cas d'erreur, nettoyer et recréer
-        if global_scraper:
-            global_scraper.cleanup()
-        global_scraper = None
+        logger.error(f"Erreur dans scraper_callback pour job {job_id}: {e}")
+        # Nettoyer l'instance
+        try:
+            scraper.cleanup()
+        except:
+            pass
         raise
 
 # Initialisation du queue manager
@@ -105,6 +104,19 @@ def index():
     import os
     frontend_path = Path(__file__).parent.parent / 'frontend' / 'index.html'
     return send_file(str(frontend_path))
+
+@app.route('/read/')
+@app.route('/read')
+def read():
+    """Alias pour la route principale - accessible via /read/"""
+    return index()
+
+@app.route('/read/<path:filename>')
+def read_files(filename):
+    """Servir les fichiers du frontend quand on accède via /read/"""
+    from pathlib import Path
+    frontend_dir = Path(__file__).parent.parent / 'frontend'
+    return send_from_directory(str(frontend_dir), filename)
 
 @app.route('/frontend/<path:filename>')
 def frontend_files(filename):

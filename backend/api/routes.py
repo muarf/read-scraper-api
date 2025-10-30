@@ -3,6 +3,7 @@ Routes API REST pour l'application
 """
 from flask import Blueprint, request, jsonify, send_file
 from pathlib import Path
+import json
 from backend.models.database import Database
 from backend.services.cache_service import CacheService
 from backend.services.queue_manager import QueueManager
@@ -90,6 +91,14 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
             'completed_at': job.get('completed_at'),
             'error_message': job.get('error_message')
         }
+
+        # Ajouter les données JSON si elles existent
+        if job.get('data'):
+            try:
+                job_data = json.loads(job['data'])
+                response_data.update(job_data)
+            except json.JSONDecodeError:
+                pass  # Ignore les données JSON invalides
         
         if job['article_id']:
             response_data['article_id'] = job['article_id']
@@ -184,6 +193,81 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
             'query': query,
             'total': len(articles)
         })
-    
+
+    # Route pour lister les screenshots de debug
+    @api_bp.route('/debug/screenshots', methods=['GET'])
+    @auth.require_api_key
+    def list_debug_screenshots():
+        """Lister les screenshots de debug disponibles"""
+        try:
+            import glob
+            import os
+            from datetime import datetime
+
+            # Chercher tous les fichiers de debug dans static (au niveau racine du projet)
+            static_dir = Path(__file__).resolve().parent.parent.parent / "static"
+            debug_pattern = str(static_dir / "debug_*.png")
+            debug_files = glob.glob(debug_pattern)
+
+            screenshots = []
+            for file_path in debug_files:
+                filename = os.path.basename(file_path)
+                # Extraire les informations du nom de fichier
+                # Format: debug_TYPE_JOBID_TIMESTAMP.png
+                name_without_ext = filename.replace('debug_', '').replace('.png', '')
+
+                # Identifier le type (peut contenir des underscores)
+                if name_without_ext.startswith('before_search_'):
+                    screenshot_type = 'before_search'
+                    remaining = name_without_ext.replace('before_search_', '', 1)
+                elif name_without_ext.startswith('search_failed_'):
+                    screenshot_type = 'search_failed'
+                    remaining = name_without_ext.replace('search_failed_', '', 1)
+                elif name_without_ext.startswith('screenshot_'):
+                    screenshot_type = 'screenshot'
+                    remaining = name_without_ext.replace('screenshot_', '', 1)
+                else:
+                    # Type inconnu, passer ce fichier
+                    logger.warning(f"Type de screenshot inconnu: {filename}")
+                    continue
+
+                # Extraire job_id et timestamp du reste
+                parts = remaining.rsplit('_', 1)  # Split sur le dernier underscore
+                if len(parts) == 2:
+                    job_id = parts[0]
+                    try:
+                        timestamp = int(parts[1])
+                    except ValueError as e:
+                        logger.warning(f"Timestamp invalide dans {filename}: {parts[1]} - {e}")
+                        continue
+
+                    screenshots.append({
+                        'filename': filename,
+                        'url': f'/static/{filename}',
+                        'path': str(file_path),
+                        'type': screenshot_type,
+                        'job_id': job_id,
+                        'timestamp': timestamp,
+                        'datetime': datetime.fromtimestamp(timestamp).isoformat(),
+                        'size': os.path.getsize(file_path)
+                    })
+                else:
+                    logger.warning(f"Format invalide pour {filename}: {remaining}")
+
+            # Trier par date décroissante (plus récent en premier)
+            screenshots.sort(key=lambda x: x['timestamp'], reverse=True)
+
+            return jsonify({
+                'screenshots': screenshots,
+                'total': len(screenshots)
+            })
+
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération des screenshots: {e}")
+            return jsonify({
+                'error': 'Erreur serveur',
+                'message': str(e)
+            }), 500
+
     return api_bp
 

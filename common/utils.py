@@ -5,15 +5,18 @@ import os
 from random import choice
 
 def generate_id(length):
-    alphabet = [chr(i) for i in range(33, 126) if i != 92 and i != 96]
+    # Utiliser seulement des caractères alphanumériques et -_
+    alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
     user_id = ''.join(choice(alphabet) for _ in range(length))
     return user_id
 def send_message_to_client(socketio, app, message, session_id):
-    print(message)
+    # Gestion sécurisée des caractères Unicode pour l'affichage
+    safe_message = str(message).encode('utf-8', errors='replace').decode('utf-8')
+    print(safe_message)
     # Gérer le cas où socketio est None (mode API sans WebSocket)
     if socketio is not None:
         event_name = f'server_message_{session_id}'
-        socketio.emit(event_name, {'message': message})
+        socketio.emit(event_name, {'message': safe_message})
         socketio.sleep(0)
 def file_exists(name):
     import sys

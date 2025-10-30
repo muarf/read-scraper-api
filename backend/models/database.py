@@ -4,6 +4,7 @@ Modèles de base de données unifiés (SQLite local / PostgreSQL Cloud)
 import os
 import sqlite3
 import hashlib
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -446,7 +447,29 @@ class Database:
         
         cursor.execute("SELECT COUNT(*) FROM admin_passwords WHERE is_active = 1")
         count = cursor.fetchone()[0]
-        
+
         conn.close()
         return count
+
+    def update_job_data(self, job_id: str, data: dict) -> bool:
+        """Mettre à jour les données JSON d'un job"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("""
+                UPDATE scraping_jobs
+                SET data = ?
+                WHERE id = ?
+            """, (json.dumps(data), job_id))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except Exception as e:
+            print(f"Erreur mise à jour données job {job_id}: {e}")  # Utiliser print au lieu de logger
+            return False
+
+        finally:
+            conn.close()
 

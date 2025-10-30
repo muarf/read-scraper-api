@@ -20,8 +20,8 @@ if __name__ == '__main__':
     )
     
     logger = logging.getLogger(__name__)
-    logger.info("🚀 Démarrage de l'API Scraper")
-    logger.info(f"📍 Répertoire: {root_dir}")
+    logger.info("Demarrage de l'API Scraper")
+    logger.info(f"Repertoire: {root_dir}")
     
     app.run(host='0.0.0.0', port=5000, debug=True)
 

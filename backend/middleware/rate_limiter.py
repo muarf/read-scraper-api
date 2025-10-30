@@ -5,6 +5,7 @@ from functools import wraps
 from flask import request, jsonify
 from datetime import datetime, timedelta
 from backend.config.settings import RATE_LIMIT_REQUESTS, RATE_LIMIT_WINDOW, ADMIN_RATE_LIMIT_REQUESTS
+from typing import Tuple, Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class RateLimiter:
                 if ts > cutoff
             ]
     
-    def _check_rate_limit(self, client_key: str, max_requests: int) -> tuple[bool, dict]:
+    def _check_rate_limit(self, client_key: str, max_requests: int) -> Tuple[bool, Dict[str, Any]]:
         """
         Vérifier si le client a dépassé sa limite
         

@@ -27,7 +27,7 @@ USERNAME = os.getenv("SCRAPER_USERNAME", "demo0038")
 PASSWORD = os.getenv("SCRAPER_PASSWORD", "PRESSE")
 
 # Chrome configuration
-CHROME_PATH = os.getenv("CHROME_PATH", "/usr/bin/google-chrome")
+CHROME_PATH = os.getenv("CHROME_PATH", "/usr/bin/chromium-browser")
 # Utiliser le chromedriver local (chemin absolu depuis la racine du projet)
 # BASE_DIR est backend/, donc BASE_DIR.parent est la racine du projet
 CHROMEDRIVER_LOCAL = BASE_DIR.parent / "chromedriver_local" / "chromedriver"
@@ -38,9 +38,9 @@ if CHROMEDRIVER_LOCAL.exists():
     print(f"Using local chromedriver: {CHROMEDRIVER_PATH}")
 else:
     # Fallback vers chromedriver système
-    CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH", "/usr/local/bin/chromedriver")
+    CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
     print(f"Using system chromedriver: {CHROMEDRIVER_PATH}")
-HEADLESS = os.getenv("HEADLESS", "false").lower() == "true"
+HEADLESS = True  # Forcer headless pour éviter les problèmes d'affichage
 
 # Queue
 MAX_CONCURRENT_JOBS = 1

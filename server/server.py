@@ -45,6 +45,7 @@ def handle_disconnect():
 chrome_path = '/usr/bin/google-chrome'
 options = webdriver.ChromeOptions()
 options.binary_location = chrome_path
+# Mode headless activé en production pour éviter les problèmes d'affichage
 if not debug:
     options.add_argument('--headless')
     options.add_argument('--window-size=1920x1080')
