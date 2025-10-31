@@ -79,6 +79,7 @@ class Database:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 started_at TIMESTAMP,
                 completed_at TIMESTAMP,
+                data TEXT,  -- Données JSON pour informations de debug
                 FOREIGN KEY (article_id) REFERENCES articles(id)
             )
         """)
@@ -92,6 +93,17 @@ class Database:
                 is_admin BOOLEAN DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_used TIMESTAMP,
+                is_active BOOLEAN DEFAULT 1
+            )
+        """)
+
+        # Table pour les clés API temporaires
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS temp_api_keys (
+                id TEXT PRIMARY KEY,
+                key_hash TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL,
                 is_active BOOLEAN DEFAULT 1
             )
         """)
@@ -358,7 +370,26 @@ class Database:
             return cursor.rowcount > 0
         finally:
             conn.close()
-    
+
+    def create_temp_api_key(self, key_hash: str, expires_at) -> bool:
+        """Créer une clé API temporaire"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        try:
+            temp_key_id = hashlib.sha256(f"{key_hash}{datetime.now()}".encode()).hexdigest()[:12]
+            cursor.execute("""
+                INSERT INTO temp_api_keys (id, key_hash, expires_at)
+                VALUES (?, ?, ?)
+            """, (temp_key_id, key_hash, expires_at))
+            conn.commit()
+            return True
+        except Exception as e:
+            print(f"Erreur création clé API temporaire: {e}")
+            return False
+        finally:
+            conn.close()
+
     def delete_article(self, article_id: str) -> bool:
         """Supprimer un article"""
         conn = self.get_connection()
@@ -450,6 +481,19 @@ class Database:
 
         conn.close()
         return count
+
+    def get_job_by_article_id(self, article_id: str) -> Optional[Dict[str, Any]]:
+        """Récupérer un job par l'ID de son article"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM scraping_jobs WHERE article_id = ?", (article_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            return dict(row)
+        return None
 
     def update_job_data(self, job_id: str, data: dict) -> bool:
         """Mettre à jour les données JSON d'un job"""

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ article.title }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 onclick="location.href='/'" style="cursor: pointer;" title="Retour à l'accueil"><i class="fas fa-newspaper"></i> Presse Scraper</h1>
+            <p>Article: {{ article.title }}</p>
+        </header>
+
+        <div class="main-content">
+            <div class="result-section">
+                <div class="article-preview">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2>{{ article.title }}</h2>
+                        <a id="pdfLinkTop" href="/static/{{ article.pdf_path.split('/')[-1] }}" class="btn btn-primary" download>
+                            <i class="fas fa-download"></i> Télécharger le PDF
+                        </a>
+                    </div>
+                    <div id="articleContent">{{ article.html_content | safe }}</div>
+                    <div class="actions">
+                        <a id="pdfLink" href="/static/{{ article.pdf_path.split('/')[-1] }}" class="btn btn-primary" download>
+                            <i class="fas fa-download"></i> Télécharger le PDF
+                        </a>
+                        <button id="rejectBtn" class="btn btn-danger" onclick="rejectArticle()">
+                            <i class="fas fa-times"></i> Refuser cet article
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null; // Variable globale pour stocker le job_id
+
+        // Fonction pour charger l'article depuis l'API
+        async function loadArticle(articleId) {
+            try {
+                // Récupérer la clé API temporaire
+                const tempKeyResponse = await fetch('/api/v1/get-temp-key');
+                const tempKeyData = await tempKeyResponse.json();
+                const API_KEY = tempKeyData.api_key;
+
+                // Charger les détails du job pour obtenir le job_id
+                const jobResponse = await fetch(`/api/v1/job/${articleId}`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!jobResponse.ok) {
+                    throw new Error(`HTTP ${jobResponse.status}: ${jobResponse.statusText}`);
+                }
+
+                const jobData = await jobResponse.json();
+                currentJobId = articleId; // Stocker le job_id pour le rejet
+                console.log('Job data loaded:', jobData);
+
+            } catch (error) {
+                console.error('Erreur chargement article:', error);
+            }
+        }
+
+        // Fonction pour refuser l'article
+        async function rejectArticle() {
+            if (!currentJobId) {
+                alert('Aucun job actif trouvé pour cet article');
+                return;
+            }
+
+            if (!confirm('Êtes-vous sûr de vouloir refuser cet article ? Il sera supprimé de l\'historique.')) {
+                return;
+            }
+
+            try {
+                // Récupérer la clé API temporaire
+                const tempKeyResponse = await fetch('/api/v1/get-temp-key');
+                const tempKeyData = await tempKeyResponse.json();
+                const API_KEY = tempKeyData.api_key;
+
+                const response = await fetch(`/api/v1/job/${currentJobId}/reject`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                alert('Article rejeté et supprimé de l\'historique.');
+
+                // Rediriger vers la page principale après un délai
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+
+            } catch (error) {
+                alert('Erreur lors du rejet: ' + error.message);
+            }
+        }
+
+        // Charger l'article au chargement de la page
+        const urlParams = new URLSearchParams(window.location.search);
+        const articleId = urlParams.get('id');
+        if (articleId) {
+            loadArticle(articleId);
+        }
+
+        // Le job_id est maintenant passé directement par le template
+        {% if job_id %}
+        currentJobId = "{{ job_id }}";
+        {% endif %}
+    </script>
+</body>
+</html>

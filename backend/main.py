@@ -19,13 +19,29 @@ from backend.api.routes import create_api_blueprint
 from backend.api.admin_routes import create_admin_blueprint
 import logging
 import os
+from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
-# Configuration du logging
+# Configuration du logging avec rotation
+# Créer le répertoire 'logs' s'il n'existe pas
+log_dir = Path('logs')
+log_dir.mkdir(parents=True, exist_ok=True)
+
+# Configurer le TimedRotatingFileHandler pour une rotation quotidienne
+file_handler = TimedRotatingFileHandler(
+    log_dir / 'app.log',
+    when='midnight',
+    interval=1,  # Chaque jour
+    backupCount=7,  # Garder 7 jours de logs
+    encoding='utf-8'
+)
+file_handler.suffix = "%Y-%m-%d"  # Format du suffixe pour les fichiers de backup
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('logs/app.log'),
+        file_handler,
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -40,6 +56,14 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialisation de la base de données
 db = create_database()
+
+# Nettoyer les anciens articles (plus de 30 jours)
+logger.info("Nettoyage des articles de plus de 30 jours...")
+deleted_count = db.cleanup_old_data(days_articles=30)
+if deleted_count > 0:
+    logger.info(f"{deleted_count} anciens articles nettoyés")
+else:
+    logger.info("Aucun ancien article à nettoyer")
 
 # Initialisation des services
 pdf_service = PDFService()
@@ -143,13 +167,17 @@ def admin_files(filename):
 # Route pour afficher un article scrapé
 @app.route('/article/<article_id>')
 def view_article(article_id):
-    """Afficher un article scrapé"""
+    """Afficher un article scrapé avec possibilité de rejet"""
     article = db.get_article(article_id)
-    
+
     if not article:
         return f"Article {article_id} introuvable", 404
-    
-    return render_template('article.html', article=article)
+
+    # Récupérer le job_id associé pour permettre le rejet
+    job = db.get_job_by_article_id(article_id)
+    job_id = job['id'] if job else None
+
+    return render_template('article.html', article=article, job_id=job_id)
 
 # Route statique pour les fichiers
 @app.route('/static/<path:filename>')

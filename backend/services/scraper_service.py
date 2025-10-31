@@ -5,7 +5,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+import urllib.parse as urlp
 from backend.models.database import Database
 from backend.config.settings import STATIC_DIR, HEADLESS, CHROME_PATH, CHROMEDRIVER_PATH, USERNAME, PASSWORD
 from backend.services.pdf_service import PDFService
@@ -35,6 +35,18 @@ class ScraperService:
         self.browser = None
         # Initialisation lazy - seulement quand nécessaire
         self._browser_initialized = False
+
+    def _cleanup_job_screenshots(self, job_id: str):
+        """Supprime les screenshots de debug associés à un job_id (mais pas les page_source)."""
+        try:
+            static_dir = Path(__file__).resolve().parent.parent.parent / "static"
+            pattern = f"debug_*_{job_id}_*.png"
+            for f in static_dir.glob(pattern):
+                os.remove(f)
+                logger.info(f"Fichier de debug supprimé: {f}")
+
+        except Exception as e:
+            logger.warning(f"Erreur lors du nettoyage des fichiers de debug pour le job {job_id}: {e}")
 
     def _ensure_browser(self):
         """S'assurer que le navigateur est initialisé"""
@@ -127,7 +139,71 @@ class ScraperService:
             logger.info(f"[LOGIN] Navigateur après connexion: {self.browser}")
         except Exception as e:
             logger.warning(f"[LOGIN] Erreur connexion, on continue: {e}")
-    
+
+    def _try_direct_scraping(self, browser, url, parsed_url, job_id):
+        """Tenter un scraping direct depuis l'URL pour les sites supportés"""
+        try:
+            logger.info(f"[{job_id}] Tentative de scraping direct: {url}")
+
+            # Utiliser le navigateur existant ou en créer un nouveau
+            if browser is None:
+                browser = self._get_browser()
+                if not browser:
+                    return None
+
+            # Accéder directement à l'URL
+            browser.get(url)
+
+            # Attendre que la page se charge
+            time.sleep(3)
+
+            # Chercher le contenu principal (différent selon le site)
+            domain = urlp.urlparse(url).netloc
+
+            content_selectors = {
+                'leparisien.fr': 'div.content',
+                'lemonde.fr': 'article',
+                'liberation.fr': '.article-body',
+                'mediapart.fr': '.content'
+            }
+
+            selector = content_selectors.get(domain, 'div.content')
+
+            try:
+                from selenium.webdriver.common.by import By
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+
+                content_element = WebDriverWait(browser, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                )
+
+                html_content = content_element.get_attribute('outerHTML')
+
+                # Générer un ID d'article et sauvegarder
+                article_id = generate_id(10)
+                title = browser.title or f"Article {article_id}"
+
+                # Sauvegarder dans la base de données
+                self.db.save_article(article_id, title, html_content, url, job_id)
+
+                logger.info(f"[{job_id}] Article scrapé directement: {article_id}")
+
+                return (article_id, {
+                    'id': article_id,
+                    'url': url,
+                    'title': title,
+                    'html_content': html_content
+                })
+
+            except Exception as e:
+                logger.warning(f"[{job_id}] Échec extraction contenu avec selector {selector}: {e}")
+                return None
+
+        except Exception as e:
+            logger.warning(f"[{job_id}] Échec scraping direct: {e}")
+            return None
+
     def _get_browser(self):
         """Récupérer ou initialiser le navigateur"""
         logger.info(f"[BROWSER] Vérification navigateur existant: {self.browser is not None}")
@@ -152,6 +228,9 @@ class ScraperService:
         Returns:
             tuple: (article_id, article_data) ou None en cas d'erreur
         """
+        # Nettoyer les screenshots du job précédent
+        self._cleanup_job_screenshots(job_id)
+
         # S'assurer que le navigateur est initialisé
         self._ensure_browser()
 
@@ -176,7 +255,7 @@ class ScraperService:
             if result is None:
                 logger.error(f"[{job_id}] Impossible d'extraire le titre de l'URL {url} - site protégé par Cloudflare ou indisponible")
                 # Essayer une approche alternative : utiliser l'URL elle-même comme titre
-                parsed_url = urlparse(url)
+                parsed_url = urlp.urlparse(url)
                 fallback_title = parsed_url.path.strip('/').replace('-', ' ').replace('_', ' ').title()
                 if fallback_title and len(fallback_title) > 5:
                     result = (fallback_title, fallback_title)
@@ -197,7 +276,7 @@ class ScraperService:
             # Étape 2: Générer le nom du fichier à partir du query (titre nettoyé)
             logger.info(f"[{job_id}] === ÉTAPE 2: Génération du nom de fichier ===")
             query_ = query.replace(" ", "_")
-            name = (lambda u: urlparse(u).path.split('/')[-1][:90])(query_)
+            name = (lambda u: urlp.urlparse(u).path.split('/')[-1][:90])(query_)
             logger.info(f"[{job_id}] Query_: '{query_}'")
             logger.info(f"[{job_id}] Nom généré: '{name}'")
 
@@ -238,8 +317,36 @@ class ScraperService:
                         'pdf_path': str(pdf_path)
                     })
 
-            # Étape 3: Rechercher l'article sur le site cible
-            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche sur le site cible ===")
+            # Étape 3: Recherche sur le site cible ou scraping direct
+            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche/scraping ===")
+
+            # Vérifier si l'URL vient d'un site supporté pour scraping direct
+            parsed_url = urlp.urlparse(url)
+            supported_domains = ['leparisien.fr', 'lemonde.fr', 'liberation.fr', 'mediapart.fr']
+
+            # Vérifier si le domaine contient un des domaines supportés
+            is_supported_domain = any(domain in parsed_url.netloc for domain in supported_domains)
+            logger.info(f"[{job_id}] Domaine détecté: {parsed_url.netloc}, supporté: {is_supported_domain}")
+
+            if is_supported_domain:
+                logger.info(f"[{job_id}] URL de site supporté détecté ({parsed_url.netloc}), tentative de scraping direct")
+                # Essayer le scraping direct
+                try:
+                    direct_result = self._try_direct_scraping(browser, url, parsed_url, job_id)
+                    if direct_result:
+                        logger.info(f"[{job_id}] Scraping direct réussi")
+                        # Mettre à jour les données de debug pour scraping direct
+                        self.db.update_job_data(job_id, {
+                            'scraping_method': 'direct',
+                            'source_site': parsed_url.netloc
+                        })
+                        return direct_result
+                    else:
+                        logger.info(f"[{job_id}] Scraping direct échoué, fallback vers recherche Tagadoc")
+                except Exception as e:
+                    logger.warning(f"[{job_id}] Erreur scraping direct: {e}, fallback vers recherche")
+
+            # Recherche Tagadoc comme fallback
             # Utiliser le navigateur existant si déjà ouvert pour le titre, sinon en créer un nouveau
             if browser is None:
                 browser = self._get_browser()  # Connexion seulement maintenant pour la recherche
@@ -266,6 +373,25 @@ class ScraperService:
             search_result = search_target_site(None, None, browser, query, title, job_id)
             logger.info(f"[{job_id}] Résultat recherche: {search_result}")
 
+            # Mettre à jour les données de debug avec les résultats de recherche
+            if search_result and isinstance(search_result, (list, tuple)) and len(search_result) > 1:
+                browser_results, articles = search_result
+                # Calculer les statistiques de recherche
+                total_articles = len(articles) if articles else 0
+                best_match = None
+                if articles and isinstance(articles, list):
+                    try:
+                        best_match = max(articles, key=lambda x: x.get('percentage', 0))
+                    except (ValueError, TypeError):
+                        best_match = articles[0] if articles else None
+
+                self.db.update_job_data(job_id, {
+                    'search_results_count': total_articles,
+                    'best_match_title': best_match.get('title') if best_match else None,
+                    'best_match_percentage': best_match.get('percentage', 0) if best_match else 0,
+                    'best_match_source': best_match.get('logo') if best_match else None
+                })
+
             if search_result is None:
                 # Screenshot en cas d'échec de recherche
                 try:
@@ -283,7 +409,7 @@ class ScraperService:
                 raise Exception("Aucun résultat trouvé")
             
             # Déterminer le site source depuis l'URL
-            parsed_url = urlparse(url)
+            parsed_url = urlp.urlparse(url)
             site_domain = parsed_url.netloc.lower()
             
             # Mapping des domaines aux noms de sources (doivent correspondre aux logos affichés)
@@ -369,7 +495,7 @@ class ScraperService:
             pdf_path, html_path = self.pdf_service.generate_pdf(html_content, query_, job_id)
             
             # Étape 6: Sauvegarder dans la BDD
-            site_source = urlparse(url).netloc
+            site_source = urlp.urlparse(url).netloc
             
             logger.info(f"[{job_id}] Sauvegarde dans la BDD...")
             self.db.create_article(

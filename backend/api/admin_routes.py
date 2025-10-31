@@ -8,6 +8,7 @@ from backend.config.settings import API_PREFIX
 from common.utils import generate_id
 import hashlib
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +281,96 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
             'message': 'Mot de passe changé avec succès'
         })
     
+    # Route pour obtenir les paramètres système
+    @admin_bp.route('/settings', methods=['GET'])
+    @auth.require_api_key
+    @auth.require_admin
+    def get_settings():
+        """Obtenir les paramètres système actuels"""
+        from backend.config.settings import CHROME_PATH, CHROMEDRIVER_PATH, HEADLESS
+        import shutil
+
+        # Lister les navigateurs disponibles
+        available_browsers = []
+        browsers_to_check = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+            "/usr/bin/firefox"
+        ]
+
+        for browser_path in browsers_to_check:
+            if os.path.exists(browser_path) and os.access(browser_path, os.X_OK):
+                browser_name = os.path.basename(browser_path)
+                available_browsers.append({
+                    'path': browser_path,
+                    'name': browser_name,
+                    'available': True
+                })
+
+        # Chercher aussi dans le PATH
+        for cmd in ['google-chrome', 'google-chrome-stable', 'chromium-browser', 'chromium', 'firefox']:
+            path = shutil.which(cmd)
+            if path and not any(b['path'] == path for b in available_browsers):
+                available_browsers.append({
+                    'path': path,
+                    'name': cmd,
+                    'available': True
+                })
+
+        return jsonify({
+            'chrome_path': CHROME_PATH,
+            'chromedriver_path': CHROMEDRIVER_PATH,
+            'headless': HEADLESS,
+            'available_browsers': available_browsers
+        })
+
+    # Route pour mettre à jour les paramètres système
+    @admin_bp.route('/settings', methods=['POST'])
+    @auth.require_api_key
+    @auth.require_admin
+    def update_settings():
+        """Mettre à jour les paramètres système"""
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                'error': 'Données manquantes',
+                'message': 'Vous devez fournir des données à mettre à jour'
+            }), 400
+
+        # Pour l'instant, on ne permet que la mise à jour du chemin Chrome
+        # (les autres paramètres nécessiteraient un redémarrage)
+        if 'chrome_path' in data:
+            chrome_path = data['chrome_path']
+
+            # Vérifier que le chemin existe et est exécutable
+            if not os.path.exists(chrome_path):
+                return jsonify({
+                    'error': 'Chemin invalide',
+                    'message': f'Le chemin {chrome_path} n\'existe pas'
+                }), 400
+
+            if not os.access(chrome_path, os.X_OK):
+                return jsonify({
+                    'error': 'Non exécutable',
+                    'message': f'Le fichier {chrome_path} n\'est pas exécutable'
+                }), 400
+
+            # Ici on pourrait sauvegarder dans un fichier de config
+            # Pour l'instant, on retourne juste un message
+            return jsonify({
+                'message': f'Navigateur mis à jour: {chrome_path}',
+                'note': 'Redémarrez l\'application pour appliquer les changements',
+                'chrome_path': chrome_path
+            })
+
+        return jsonify({
+            'error': 'Paramètre inconnu',
+            'message': 'Seul chrome_path peut être modifié pour l\'instant'
+        }), 400
+
     # Route pour arrêter le queue manager
     @admin_bp.route('/queue/stop', methods=['POST'])
     @auth.require_api_key

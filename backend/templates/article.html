@@ -60,11 +60,64 @@
         <a href="{{ article.pdf_path }}" class="download-button" download>
             📥 Télécharger le PDF
         </a>
+        <div style="margin-top: 15px; text-align: center;">
+            <button id="rejectBtnTop" style="padding: 10px 20px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;" onclick="rejectArticle()">
+                <i class="fas fa-times" style="margin-right: 5px;"></i>Refuser cet article
+            </button>
+        </div>
     </div>
-    
+
     <div class="article-content">
         {{ article.html_content|safe }}
     </div>
+
+    <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e5e5; text-align: center;">
+        <button id="rejectBtn" style="padding: 12px 24px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px;" onclick="rejectArticle()">
+            <i class="fas fa-times" style="margin-right: 8px;"></i>Refuser cet article
+        </button>
+    </div>
+
+    <script>
+        let currentJobId = "{{ job_id }}" || null;
+
+        async function rejectArticle() {
+            if (!currentJobId) {
+                alert('Aucun job actif trouvé pour cet article');
+                return;
+            }
+
+            if (!confirm('Êtes-vous sûr de vouloir refuser cet article ? Il sera supprimé de l\'historique.')) {
+                return;
+            }
+
+            try {
+                // Récupérer la clé API temporaire
+                const tempKeyResponse = await fetch('/api/v1/get-temp-key');
+                const tempKeyData = await tempKeyResponse.json();
+                const API_KEY = tempKeyData.api_key;
+
+                const response = await fetch(`/api/v1/job/${currentJobId}/reject`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                alert('Article rejeté et supprimé de l\'historique.');
+
+                // Rediriger vers la page principale après un délai
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+
+            } catch (error) {
+                alert('Erreur lors du rejet: ' + error.message);
+            }
+        }
+    </script>
 </body>
 </html>
 

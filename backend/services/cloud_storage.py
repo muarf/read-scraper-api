@@ -5,9 +5,17 @@ import os
 import tempfile
 from pathlib import Path
 from typing import Optional, Tuple
-from google.cloud import storage
-from google.api_core.exceptions import NotFound
 import logging
+
+# Imports Google Cloud optionnels
+try:
+    from google.cloud import storage
+    from google.api_core.exceptions import NotFound
+    GOOGLE_CLOUD_AVAILABLE = True
+except ImportError:
+    GOOGLE_CLOUD_AVAILABLE = False
+    storage = None
+    NotFound = Exception  # Fallback générique
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +37,12 @@ class CloudStorageService:
 
     def _init_client(self):
         """Initialise le client Cloud Storage"""
+        if not GOOGLE_CLOUD_AVAILABLE:
+            logger.warning("Google Cloud Storage non disponible - mode simulation")
+            self.client = None
+            self.bucket = None
+            return
+
         try:
             # En mode développement/test, on ne se connecte pas vraiment
             # Cela évite les erreurs d'authentification GCP

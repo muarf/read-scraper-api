@@ -21,9 +21,12 @@ def download_article(socketio, app, driver, link, session_id, save_dir='download
         driver.get(link)
         send_message_to_client(socketio, app, "Lien chargé avec succès", session_id)
         
-        # Attendre quelques secondes pour que le JavaScript se charge
-        time.sleep(10)  # Attendre 5 secondes (ajustez si nécessaire)
-
+        # Attendre dynamiquement que le contenu soit chargé (évite un sleep arbitraire)
+        # On attend jusqu'à 20s max la présence de la div article via la classe vue dans l'exemple
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.content.hyphenate.typo-correct"))
+        )
+        
         # Enregistrer la source HTML de la page
         page_source = driver.page_source
         sanitized_session_id = sanitize_filename(session_id)

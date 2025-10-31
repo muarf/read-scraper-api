@@ -26,8 +26,38 @@ API_PREFIX = f"/api/{API_VERSION}"
 USERNAME = os.getenv("SCRAPER_USERNAME", "demo0038")
 PASSWORD = os.getenv("SCRAPER_PASSWORD", "PRESSE")
 
-# Chrome configuration
-CHROME_PATH = os.getenv("CHROME_PATH", "/usr/bin/chromium-browser")
+# Chrome configuration - détection automatique du navigateur
+def find_chrome_binary():
+    """Trouve automatiquement un navigateur Chrome disponible"""
+    import shutil
+
+    # Liste des navigateurs à essayer dans l'ordre de préférence
+    browsers = [
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium-browser",
+        "chromium"
+    ]
+
+    # Essayer les chemins absolus d'abord
+    for browser in browsers[:4]:  # Premiers 4 sont des chemins absolus
+        if os.path.exists(browser) and os.access(browser, os.X_OK):
+            return browser
+
+    # Essayer les commandes dans le PATH
+    for browser in browsers[4:]:  # Derniers sont des commandes
+        if shutil.which(browser):
+            return shutil.which(browser)
+
+    # Fallback par défaut
+    return "/usr/bin/google-chrome"
+
+CHROME_PATH = os.getenv("CHROME_PATH", find_chrome_binary())
+print(f"Using Chrome binary: {CHROME_PATH}")
 # Utiliser le chromedriver local (chemin absolu depuis la racine du projet)
 # BASE_DIR est backend/, donc BASE_DIR.parent est la racine du projet
 CHROMEDRIVER_LOCAL = BASE_DIR.parent / "chromedriver_local" / "chromedriver"
@@ -40,11 +70,11 @@ else:
     # Fallback vers chromedriver système
     CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
     print(f"Using system chromedriver: {CHROMEDRIVER_PATH}")
-HEADLESS = True  # Forcer headless pour éviter les problèmes d'affichage
+HEADLESS = False  # Mode headless désactivé pour le développement local
 
 # Queue
 MAX_CONCURRENT_JOBS = 1
-JOB_TIMEOUT = 60  # seconds
+JOB_TIMEOUT = 180  # seconds (augmenté)
 MAX_RETRIES = 3
 
 # Cache

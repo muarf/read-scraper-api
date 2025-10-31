@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Presse Scraper - API</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/frontend/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -109,13 +109,71 @@
     </div>
 
     <script>
-        const API_KEY = 'VN7hVSfWe2?aQ}dxIb$k!/%jDRrBP59v';
-        // Détecter dynamiquement l'URL de base
+        // Configuration de la clé API
+        // Option 1: Clé API fixe (décommentez et remplacez par votre clé)
+        // Pour obtenir une clé API fixe :
+        // 1. Allez sur /admin et connectez-vous (mot de passe: admin123)
+        // 2. Cliquez sur l'onglet "API Keys"
+        // 3. Cliquez sur "Créer une clé API"
+        // 4. Copiez la clé générée et remplacez 'votre-cle-api-fixe-ici' ci-dessous
+        // let API_KEY = 'votre-cle-api-fixe-ici';
+
+        // Option 2: Clé API automatique (temporaire) - activée par défaut
+        // Le frontend obtient automatiquement une clé temporaire via /api/v1/get-temp-key
+        let API_KEY = null; // Sera défini automatiquement via /get-temp-key
+
         const API_BASE = window.location.protocol + '//' + window.location.host + '/api/v1';
 
         // Debug mode - activé automatiquement
         const DEBUG_MODE = true;
         let debugVisible = false;
+
+        // Fonction pour obtenir une clé API temporaire
+        async function getTempApiKey() {
+            try {
+                debugLog('Obtention d\'une clé API temporaire...');
+                const response = await fetch(`${API_BASE}/get-temp-key`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                API_KEY = data.api_key;
+                debugLog('Clé API temporaire obtenue', { expires_in: data.expires_in });
+
+                // Stocker la clé dans sessionStorage pour éviter de la redemander
+                sessionStorage.setItem('tempApiKey', API_KEY);
+
+                return API_KEY;
+            } catch (error) {
+                debugLog('Erreur obtention clé temporaire', error);
+                alert('Erreur: Impossible d\'obtenir une clé API. Veuillez réessayer.');
+                throw error;
+            }
+        }
+
+        // Obtenir la clé API au démarrage
+        async function initializeApiKey() {
+            // Si une clé API fixe est définie, l'utiliser directement
+            if (typeof API_KEY === 'string' && API_KEY && API_KEY !== 'votre-cle-api-fixe-ici') {
+                debugLog('Utilisation de la clé API fixe configurée');
+                // Stocker dans sessionStorage pour cohérence
+                sessionStorage.setItem('tempApiKey', API_KEY);
+                return;
+            }
+
+            // Vérifier si on a déjà une clé temporaire en session
+            const storedKey = sessionStorage.getItem('tempApiKey');
+            if (storedKey) {
+                API_KEY = storedKey;
+                debugLog('Clé API temporaire récupérée du cache');
+                return;
+            }
+
+            // Obtenir une nouvelle clé temporaire
+            await getTempApiKey();
+        }
 
         function debugLog(message, data = null) {
             if (DEBUG_MODE) {
@@ -296,6 +354,10 @@
         const urlInput = document.getElementById('urlInput');
         const scrapeBtn = document.getElementById('scrapeBtn');
 
+        // Désactiver le bouton tant que la clé API n'est pas chargée
+        scrapeBtn.disabled = true;
+        scrapeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Chargement...';
+
         scrapeBtn.addEventListener('click', handleScrape);
 
         // Ajouter la fonctionnalité de touche Entrée
@@ -329,19 +391,40 @@
             document.getElementById('toggleDebugBtn').innerHTML = '<i class="fas fa-eye-slash"></i> Cacher Debug';
         }
 
-        debugLog('Application initialisée', {
-            apiBase: API_BASE,
-            debugMode: DEBUG_MODE,
-            userAgent: navigator.userAgent
+        // Initialiser la clé API puis l'application
+        initializeApiKey().then(() => {
+            debugLog('Application initialisée', {
+                apiBase: API_BASE,
+                debugMode: DEBUG_MODE,
+                hasApiKey: !!API_KEY,
+                userAgent: navigator.userAgent
+            });
+
+            // Réactiver le bouton scrape maintenant que la clé API est disponible
+            scrapeBtn.disabled = false;
+            scrapeBtn.innerHTML = '<i class="fas fa-magic"></i> Scraper';
+
+            // Une fois la clé API obtenue, charger l'historique
+            loadHistory();
+        }).catch(error => {
+            debugLog('Erreur lors de l\'initialisation', error);
+            // En cas d'erreur, afficher un message et garder le bouton désactivé
+            scrapeBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Erreur API';
         });
 
         async function handleScrape() {
             const url = urlInput.value.trim();
-            debugLog('Début du scraping', { url });
+            debugLog('Début du scraping', { url, hasApiKey: !!API_KEY });
 
             if (!url) {
                 debugLog('URL vide détectée');
                 alert('Veuillez entrer une URL');
+                return;
+            }
+
+            if (!API_KEY) {
+                debugLog('Clé API non disponible');
+                alert('La clé API n\'est pas encore chargée. Veuillez patienter...');
                 return;
             }
 
@@ -399,7 +482,7 @@
         let currentModalIndex = 0;
 
         function pollJobStatus(jobId) {
-            const maxAttempts = 30; // Réduit de 60 à 30 (60 secondes max au lieu de 120)
+            const maxAttempts = 120; // Augmenté pour couvrir des traitements plus longs (jusqu'à ~6 min)
             let attempts = 0;
             const startTime = Date.now();
             currentJobId = jobId;
@@ -500,14 +583,32 @@
             const stepIndicator = document.getElementById('currentStepIndicator');
             if (stepIndicator) {
                 const status = getReadableStatus(jobData.status);
-                const searchTerms = jobData.search_terms || 'N/A';
+
+                // Afficher les informations de debug dans la console aussi
+                if (jobData.search_terms) {
+                    debugLog(`🔍 Termes de recherche: "${jobData.search_terms}"`);
+                }
+                if (jobData.extracted_title) {
+                    debugLog(`📄 Titre extrait: "${jobData.extracted_title}"`);
+                }
+                if (jobData.search_results_count !== undefined) {
+                    debugLog(`🔎 Résultats trouvés: ${jobData.search_results_count} articles`);
+                }
+                if (jobData.best_match_title && jobData.best_match_percentage > 0) {
+                    debugLog(`🎯 Meilleur résultat: "${jobData.best_match_title}" (${jobData.best_match_percentage}% similarité)`);
+                    if (jobData.best_match_source) {
+                        debugLog(`📊 Source: ${jobData.best_match_source}`);
+                    }
+                }
 
                 stepIndicator.innerHTML = `
                     <div class="current-step">
                         <h3>Étape actuelle: ${status}</h3>
-                        <p><strong>Termes de recherche:</strong> ${searchTerms}</p>
-                        ${jobData.article_title ? `<p><strong>Titre trouvé:</strong> ${jobData.article_title.substring(0, 100)}...</p>` : ''}
-                        ${jobData.similarity_score ? `<p><strong>Similarité:</strong> ${jobData.similarity_score}%</p>` : ''}
+                        ${jobData.search_terms ? `<p><strong>🔍 Termes:</strong> ${jobData.search_terms}</p>` : ''}
+                        ${jobData.extracted_title ? `<p><strong>📄 Titre:</strong> ${jobData.extracted_title.substring(0, 80)}...</p>` : ''}
+                        ${jobData.search_results_count !== undefined ? `<p><strong>🔎 Résultats:</strong> ${jobData.search_results_count} articles trouvés</p>` : ''}
+                        ${jobData.best_match_percentage > 0 ? `<p><strong>🎯 Meilleure similarité:</strong> ${jobData.best_match_percentage}%</p>` : ''}
+                        ${jobData.best_match_source ? `<p><strong>📊 Source:</strong> ${jobData.best_match_source}</p>` : ''}
                     </div>
                 `;
             }
@@ -681,8 +782,6 @@
                 console.error('Erreur chargement historique:', error);
             }
         }
-
-        loadHistory();
     </script>
 </body>
 </html>

@@ -150,18 +150,46 @@
 
             <!-- Onglet Paramètres -->
             <div id="settingsTab" class="tab-content">
+                <!-- Configuration Navigateur -->
+                <div class="settings-section">
+                    <h2><i class="fas fa-globe"></i> Configuration Navigateur</h2>
+                    <div class="settings-form">
+                        <div class="current-settings">
+                            <p><strong>Navigateur actuel:</strong> <span id="currentBrowser">-</span></p>
+                            <p><strong>ChromeDriver:</strong> <span id="currentChromeDriver">-</span></p>
+                            <p><strong>Mode headless:</strong> <span id="currentHeadless">-</span></p>
+                        </div>
+
+                        <label for="browserSelect">Changer de navigateur:</label>
+                        <select id="browserSelect" class="form-control">
+                            <option value="">Chargement...</option>
+                        </select>
+
+                        <button onclick="updateBrowser()" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Mettre à jour le navigateur
+                        </button>
+                        <p id="browserMessage" style="margin-top: 10px;"></p>
+
+                        <div class="warning-note">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Note:</strong> Après avoir changé de navigateur, redémarrez l'application pour appliquer les changements.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Changement de mot de passe -->
                 <div class="settings-section">
                     <h2><i class="fas fa-lock"></i> Changement de mot de passe admin</h2>
                     <div class="settings-form">
                         <label for="currentPassword">Mot de passe actuel:</label>
                         <input type="password" id="currentPassword" placeholder="Entrez le mot de passe actuel" />
-                        
+
                         <label for="newPassword">Nouveau mot de passe:</label>
                         <input type="password" id="newPassword" placeholder="Minimum 6 caractères" />
-                        
+
                         <label for="confirmPassword">Confirmer le nouveau mot de passe:</label>
                         <input type="password" id="confirmPassword" placeholder="Répétez le mot de passe" />
-                        
+
                         <button onclick="changePassword()" class="btn btn-primary">
                             <i class="fas fa-save"></i> Changer le mot de passe
                         </button>
@@ -173,7 +201,7 @@
     </div>
 
     <script>
-        const API_KEY = '8a2hL:9o*.g8&*>;^2GP5Q;tT~-n]^Nl';
+        const API_KEY = 'v4kV8koC8BXSTXe07-0CDaoLxTj3zFAr';
         const API_BASE = 'http://localhost:5000/api/v1';
         
         // Vérifier si l'utilisateur est déjà connecté
@@ -236,7 +264,7 @@
                 else if (tabId === 'articles') loadArticles();
                 else if (tabId === 'jobs') loadJobs();
                 else if (tabId === 'apikeys') loadApiKeys();
-                else if (tabId === 'settings') resetPasswordForm();
+                else if (tabId === 'settings') loadSettings();
             });
         });
 
@@ -301,6 +329,91 @@
                 });
             } catch (error) {
                 console.error('Erreur chargement articles:', error);
+            }
+        }
+
+        // Charger les paramètres système
+        async function loadSettings() {
+            try {
+                const response = await fetch(`${API_BASE}/admin/settings`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    console.error('Erreur chargement settings:', response.status, response.statusText);
+                    return;
+                }
+
+                const settings = await response.json();
+
+                // Afficher les paramètres actuels
+                document.getElementById('currentBrowser').textContent = settings.chrome_path;
+                document.getElementById('currentChromeDriver').textContent = settings.chromedriver_path;
+                document.getElementById('currentHeadless').textContent = settings.headless ? 'Oui' : 'Non';
+
+                // Remplir le select des navigateurs disponibles
+                const select = document.getElementById('browserSelect');
+                select.innerHTML = '<option value="">Choisir un navigateur...</option>';
+
+                settings.available_browsers.forEach(browser => {
+                    const option = document.createElement('option');
+                    option.value = browser.path;
+                    option.textContent = `${browser.name} (${browser.path})`;
+                    if (browser.path === settings.chrome_path) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+
+            } catch (error) {
+                console.error('Erreur chargement settings:', error);
+            }
+        }
+
+        // Mettre à jour le navigateur
+        async function updateBrowser() {
+            const select = document.getElementById('browserSelect');
+            const browserPath = select.value;
+            const message = document.getElementById('browserMessage');
+
+            if (!browserPath) {
+                message.style.color = '#e74c3c';
+                message.textContent = 'Veuillez sélectionner un navigateur';
+                return;
+            }
+
+            try {
+                message.style.color = '#3498db';
+                message.textContent = 'Mise à jour en cours...';
+
+                const response = await fetch(`${API_BASE}/admin/settings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify({ chrome_path: browserPath })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    message.style.color = '#27ae60';
+                    message.textContent = result.message;
+                    if (result.note) {
+                        message.innerHTML += '<br><small style="color: #e67e22">' + result.note + '</small>';
+                    }
+                    // Recharger les paramètres
+                    setTimeout(() => loadSettings(), 1000);
+                } else {
+                    message.style.color = '#e74c3c';
+                    message.textContent = result.message || 'Erreur lors de la mise à jour';
+                }
+
+            } catch (error) {
+                console.error('Erreur mise à jour navigateur:', error);
+                message.style.color = '#e74c3c';
+                message.textContent = 'Erreur de connexion';
             }
         }
 

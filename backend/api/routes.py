@@ -11,6 +11,7 @@ from backend.middleware.auth import AuthMiddleware
 from backend.middleware.rate_limiter import RateLimiter
 from backend.config.settings import STATIC_DIR, API_PREFIX
 from common.utils import generate_id
+import hashlib
 import logging
 
 logger = logging.getLogger(__name__)
@@ -151,10 +152,36 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
             }), 404
         
         return send_file(str(pdf_path), mimetype='application/pdf')
-    
-    # Route pour lister les articles
+
+    # Route pour obtenir une clé API temporaire (pour les utilisateurs anonymes)
+    @api_bp.route('/get-temp-key', methods=['GET'])
+    @rate_limiter.rate_limit
+    def get_temp_api_key():
+        """Générer une clé API temporaire pour les utilisateurs anonymes"""
+        from datetime import datetime, timedelta
+
+        # Générer une clé temporaire (valide 24h)
+        temp_key = f"temp_{generate_id(16)}"
+        temp_key_hash = hashlib.sha256(temp_key.encode()).hexdigest()
+
+        # Créer la clé dans la base (expire dans 24h)
+        expires_at = datetime.now() + timedelta(hours=24)
+
+        if db.create_temp_api_key(temp_key_hash, expires_at):
+            return jsonify({
+                'api_key': temp_key,
+                'expires_in': 86400,  # 24h en secondes
+                'message': 'Clé API temporaire créée (valide 24h)'
+            })
+
+        return jsonify({
+            'error': 'Erreur création clé temporaire',
+            'message': 'Impossible de créer une clé API temporaire'
+        }), 500
+
+    # Route pour lister les articles (publique pour le frontend)
     @api_bp.route('/articles', methods=['GET'])
-    @auth.require_api_key
+    @rate_limiter.rate_limit
     def list_articles():
         """Lister les articles avec pagination et recherche"""
         limit = request.args.get('limit', 50, type=int)
