@@ -37,12 +37,32 @@ file_handler = TimedRotatingFileHandler(
 )
 file_handler.suffix = "%Y-%m-%d"  # Format du suffixe pour les fichiers de backup
 
+# Créer un StreamHandler avec encodage UTF-8 pour éviter les erreurs Unicode
+import io
+
+# Configurer stdout/stderr pour UTF-8
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        # Python 3.7+
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    elif hasattr(sys.stdout, 'buffer'):
+        # Pour Python < 3.7, wrapper avec TextIOWrapper
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', line_buffering=True)
+except Exception:
+    # Si la configuration échoue, on continue quand même (logging pas encore configuré)
+    pass
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         file_handler,
-        logging.StreamHandler(sys.stdout)
+        console_handler
     ]
 )
 
@@ -164,8 +184,20 @@ def admin_files(filename):
     admin_dir = Path(__file__).parent.parent / 'admin'
     return send_from_directory(str(admin_dir), filename)
 
+# Alias pour l'admin via /read/admin
+@app.route('/read/admin')
+def read_admin():
+    """Alias vers l'interface admin accessible via /read/admin"""
+    return admin()
+
+@app.route('/read/admin/<path:filename>')
+def read_admin_files(filename):
+    """Servir les fichiers de l'admin via /read/admin/"""
+    return admin_files(filename)
+
 # Route pour afficher un article scrapé
 @app.route('/article/<article_id>')
+@app.route('/read/article/<article_id>')
 def view_article(article_id):
     """Afficher un article scrapé avec possibilité de rejet"""
     article = db.get_article(article_id)

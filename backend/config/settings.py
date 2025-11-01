@@ -26,6 +26,34 @@ API_PREFIX = f"/api/{API_VERSION}"
 USERNAME = os.getenv("SCRAPER_USERNAME", "demo0038")
 PASSWORD = os.getenv("SCRAPER_PASSWORD", "PRESSE")
 
+# Fichier de configuration pour le navigateur
+BROWSER_CONFIG_FILE = BASE_DIR / "data" / "browser_config.json"
+
+def load_browser_config():
+    """Charger la configuration du navigateur depuis le fichier"""
+    import json
+    if BROWSER_CONFIG_FILE.exists():
+        try:
+            with open(BROWSER_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+                if 'chrome_path' in config and os.path.exists(config['chrome_path']) and os.access(config['chrome_path'], os.X_OK):
+                    return config['chrome_path']
+        except Exception as e:
+            print(f"Erreur lors du chargement de la config navigateur: {e}")
+    return None
+
+def save_browser_config(chrome_path):
+    """Sauvegarder la configuration du navigateur dans le fichier"""
+    import json
+    try:
+        config = {'chrome_path': chrome_path}
+        with open(BROWSER_CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Erreur lors de la sauvegarde de la config navigateur: {e}")
+        return False
+
 # Chrome configuration - détection automatique du navigateur
 def find_chrome_binary():
     """Trouve automatiquement un navigateur Chrome disponible"""
@@ -56,7 +84,9 @@ def find_chrome_binary():
     # Fallback par défaut
     return "/usr/bin/google-chrome"
 
-CHROME_PATH = os.getenv("CHROME_PATH", find_chrome_binary())
+# Charger la configuration sauvegardée, sinon utiliser la variable d'environnement ou la détection automatique
+saved_chrome_path = load_browser_config()
+CHROME_PATH = os.getenv("CHROME_PATH") or saved_chrome_path or find_chrome_binary()
 print(f"Using Chrome binary: {CHROME_PATH}")
 # Utiliser le chromedriver local (chemin absolu depuis la racine du projet)
 # BASE_DIR est backend/, donc BASE_DIR.parent est la racine du projet
@@ -70,7 +100,7 @@ else:
     # Fallback vers chromedriver système
     CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
     print(f"Using system chromedriver: {CHROMEDRIVER_PATH}")
-HEADLESS = False  # Mode headless désactivé pour le développement local
+HEADLESS = True  # Mode headless désactivé pour le développement local
 
 # Queue
 MAX_CONCURRENT_JOBS = 1

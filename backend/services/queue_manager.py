@@ -6,6 +6,7 @@ import time
 from typing import Optional
 from backend.models.database import Database
 from backend.config.settings import JOB_TIMEOUT, MAX_RETRIES
+from common.utils import NoResultException
 import logging
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,13 @@ class QueueManager:
                 logger.info(f"Job {job_id} complété avec succès en {duration:.2f}s")
             else:
                 raise Exception("Scraping échoué: résultat vide")
+        
+        except NoResultException as e:
+            # Ne pas retry pour les erreurs "Aucun résultat trouvé"
+            error_msg = str(e)
+            logger.error(f"Erreur traitement job {job_id}: {error_msg}")
+            self.db.update_job_status(job_id, 'failed', error=error_msg)
+            logger.info(f"Job {job_id} échoué sans retry (aucun résultat)")
         
         except Exception as e:
             error_msg = str(e)

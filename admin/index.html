@@ -201,8 +201,9 @@
     </div>
 
     <script>
-        const API_KEY = 'v4kV8koC8BXSTXe07-0CDaoLxTj3zFAr';
-        const API_BASE = 'http://localhost:5000/api/v1';
+        const API_KEY = 'i-Au-D25qOqX9LMopB7wHJR8lM-HVHso';
+        // Utiliser l'URL relative pour fonctionner avec n'importe quel hôte
+        const API_BASE = window.location.origin + '/api/v1';
         
         // Vérifier si l'utilisateur est déjà connecté
         if (!sessionStorage.getItem('adminLoggedIn')) {

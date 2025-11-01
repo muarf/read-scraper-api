@@ -114,8 +114,8 @@ def extract_title(url, browser=None, max_words=15):
             .replace("“", '"')
             .replace("”", '"')
         )
-        # 3) supprimer la ponctuation
-        extra_punct = "…–—«»\"\"''"
+        # 3) supprimer la ponctuation (y compris les slashes)
+        extra_punct = "…–—«»\"\"''/"
         punctuation_chars = string.punctuation + extra_punct
         title_no_punct = title_core.translate(str.maketrans(punctuation_chars, ' ' * len(punctuation_chars)))
 
@@ -190,7 +190,12 @@ def extract_title(url, browser=None, max_words=15):
         # Recomposer la chaîne filtrée (limiter à max_words mots significatifs)
         query = ' '.join(deduped_words[:max_words])
 
-        return query, title
+        # Nettoyer aussi le titre pour l'affichage (remplacer les slashes)
+        clean_title = title.replace('/', ' ').replace('\\', ' ')
+        # Nettoyer les espaces multiples
+        clean_title = ' '.join(clean_title.split())
+
+        return query, clean_title
 
     except Exception as e:
         print(f"Une erreur s'est produite lors de l'extraction du titre : {e}")

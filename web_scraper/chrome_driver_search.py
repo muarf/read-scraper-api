@@ -57,7 +57,7 @@ def search_target_site(socketio, app, driver, query, title,session_id):
 
         # Screenshot après saisie des termes
         try:
-            after_input_screenshot = f"/root/read-scraper-api/static/debug_after_input_{job_id}_{int(time.time())}.png"
+            after_input_screenshot = f"/root/read-scraper-api/static/debug_after_input_{session_id}_{int(time.time())}.png"
             driver.save_screenshot(after_input_screenshot)
             print(f"Screenshot après saisie des termes: {after_input_screenshot}")
         except Exception as ss_error:
@@ -159,11 +159,11 @@ def search_target_site(socketio, app, driver, query, title,session_id):
             if no_result_element:
                 driver.save_screenshot('ss.png')
                 send_message_to_client(socketio, app, "Aucun résultat trouvé pour la requête",session_id)
-                result_data_sorted = {'msg': 'Aucun résultat trouvé pour la requête'}
+                result_data_sorted = []  # Retourner une liste vide au lieu d'un dict
             else:
                 driver.save_screenshot('ss.png')
                 send_message_to_client(socketio, app, "Erreur lors du chargement des résultats de recherche.", session_id)
-                result_data_sorted = None
+                result_data_sorted = []
 
 
             # Retourner l'instance du navigateur pour une utilisation ultérieure

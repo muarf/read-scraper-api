@@ -98,6 +98,112 @@ header p {
     background: #f8f9fa;
 }
 
+.status-card.error {
+    border-color: #e74c3c;
+}
+
+.status-card.error .spinner {
+    display: none;
+}
+
+.retry-section {
+    margin-top: 20px;
+}
+
+.retry-card {
+    padding: 25px;
+    border: 2px solid #3498db;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #f0f8ff 0%, #e8f4f8 100%);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.1);
+}
+
+.retry-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.retry-header i {
+    font-size: 1.5em;
+    color: #3498db;
+}
+
+.retry-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.3em;
+}
+
+.retry-description {
+    color: #7f8c8d;
+    margin-bottom: 20px;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.retry-input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.retry-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.retry-input-icon {
+    position: absolute;
+    left: 15px;
+    color: #95a5a6;
+    font-size: 1.1em;
+}
+
+#customSearchTerms {
+    flex: 1;
+    padding: 15px 15px 15px 45px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 1em;
+    transition: all 0.3s;
+}
+
+#customSearchTerms:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.btn-retry {
+    width: 100%;
+    padding: 15px 25px;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.input-type-indicator {
+    margin-top: 12px;
+    padding: 10px 15px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.9em;
+    color: #667eea;
+    font-weight: 500;
+}
+
+.input-type-indicator i {
+    font-size: 1.1em;
+}
+
 .spinner {
     width: 30px;
     height: 30px;

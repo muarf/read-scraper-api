@@ -4,6 +4,12 @@ from flask import jsonify, make_response, render_template
 import os
 from random import choice
 
+
+class NoResultException(Exception):
+    """Exception pour indiquer qu'aucun résultat n'a été trouvé (ne doit pas être retry)"""
+    pass
+
+
 def generate_id(length):
     # Utiliser seulement des caractères alphanumériques et -_
     alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
@@ -11,8 +17,13 @@ def generate_id(length):
     return user_id
 def send_message_to_client(socketio, app, message, session_id):
     # Gestion sécurisée des caractères Unicode pour l'affichage
-    safe_message = str(message).encode('utf-8', errors='replace').decode('utf-8')
-    print(safe_message)
+    try:
+        safe_message = str(message).encode('utf-8', errors='replace').decode('utf-8')
+        print(safe_message)
+    except UnicodeEncodeError:
+        # Fallback si l'encodage échoue encore
+        safe_message = str(message).encode('ascii', errors='replace').decode('ascii')
+        print(safe_message)
     # Gérer le cas où socketio est None (mode API sans WebSocket)
     if socketio is not None:
         event_name = f'server_message_{session_id}'

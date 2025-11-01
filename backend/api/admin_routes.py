@@ -358,13 +358,23 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
                     'message': f'Le fichier {chrome_path} n\'est pas exécutable'
                 }), 400
 
-            # Ici on pourrait sauvegarder dans un fichier de config
-            # Pour l'instant, on retourne juste un message
-            return jsonify({
-                'message': f'Navigateur mis à jour: {chrome_path}',
-                'note': 'Redémarrez l\'application pour appliquer les changements',
-                'chrome_path': chrome_path
-            })
+            # Sauvegarder la configuration dans le fichier
+            from backend.config.settings import save_browser_config
+            if save_browser_config(chrome_path):
+                # Mettre à jour la variable CHROME_PATH pour les nouvelles instances
+                import backend.config.settings as settings_module
+                settings_module.CHROME_PATH = chrome_path
+                
+                return jsonify({
+                    'message': f'Navigateur mis à jour: {chrome_path}',
+                    'note': 'La configuration a été sauvegardée. Le prochain scraping utilisera ce navigateur.',
+                    'chrome_path': chrome_path
+                })
+            else:
+                return jsonify({
+                    'error': 'Erreur sauvegarde',
+                    'message': 'Impossible de sauvegarder la configuration'
+                }), 500
 
         return jsonify({
             'error': 'Paramètre inconnu',

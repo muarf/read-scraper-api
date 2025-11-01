@@ -18,10 +18,14 @@
         <div class="main-content">
             <div class="search-section">
                 <div class="input-group">
-                    <input type="text" id="urlInput" placeholder="Collez l'URL de l'article à scraper..." />
+                    <input type="text" id="urlInput" placeholder="Collez l'URL de l'article ou entrez des termes de recherche..." />
                     <button id="scrapeBtn">
                         <i class="fas fa-magic"></i> Scraper
                     </button>
+                </div>
+                <div id="inputTypeIndicator" class="input-type-indicator" style="display: none;">
+                    <span id="inputTypeIcon"></span>
+                    <span id="inputTypeText"></span>
                 </div>
             </div>
 
@@ -29,6 +33,24 @@
                 <div class="status-card">
                     <div class="spinner"></div>
                     <p id="statusText">Initialisation...</p>
+                </div>
+                <div id="retrySection" class="retry-section" style="display: none;">
+                    <div class="retry-card">
+                        <div class="retry-header">
+                            <i class="fas fa-edit"></i>
+                            <h3>Modifier les termes de recherche</h3>
+                        </div>
+                        <p class="retry-description">Aucun résultat trouvé. Essayez avec des termes de recherche différents :</p>
+                        <div class="retry-input-group">
+                            <div class="retry-input-wrapper">
+                                <i class="fas fa-search retry-input-icon"></i>
+                                <input type="text" id="customSearchTerms" placeholder="Ex: Titre article, mots-clés..." />
+                            </div>
+                            <button id="retryWithCustomBtn" class="btn btn-primary btn-retry">
+                                <i class="fas fa-redo"></i> Relancer la recherche
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -144,6 +166,7 @@
 
                 // Stocker la clé dans sessionStorage pour éviter de la redemander
                 sessionStorage.setItem('tempApiKey', API_KEY);
+                sessionStorage.setItem('tempApiKeyExpiry', String(Date.now() + data.expires_in * 1000));
 
                 return API_KEY;
             } catch (error) {
@@ -165,10 +188,20 @@
 
             // Vérifier si on a déjà une clé temporaire en session
             const storedKey = sessionStorage.getItem('tempApiKey');
-            if (storedKey) {
-                API_KEY = storedKey;
-                debugLog('Clé API temporaire récupérée du cache');
-                return;
+            const expiryTime = sessionStorage.getItem('tempApiKeyExpiry');
+            
+            if (storedKey && expiryTime) {
+                // Vérifier si la clé n'a pas expiré
+                const now = Date.now();
+                if (now < parseInt(expiryTime)) {
+                    API_KEY = storedKey;
+                    debugLog('Clé API temporaire récupérée du cache');
+                    return;
+                } else {
+                    debugLog('Clé API temporaire expirée, en obtenant une nouvelle');
+                    sessionStorage.removeItem('tempApiKey');
+                    sessionStorage.removeItem('tempApiKeyExpiry');
+                }
             }
 
             // Obtenir une nouvelle clé temporaire
@@ -289,6 +322,7 @@
                 info.className = 'screenshot-info';
                 const typeLabels = {
                     'before_search': 'Avant recherche',
+                    'after_input': 'Après saisie',
                     'search_failed': 'Échec recherche',
                     'screenshot': 'Screenshot final'
                 };
@@ -353,6 +387,49 @@
         const statusText = document.getElementById('statusText');
         const urlInput = document.getElementById('urlInput');
         const scrapeBtn = document.getElementById('scrapeBtn');
+        const inputTypeIndicator = document.getElementById('inputTypeIndicator');
+        const inputTypeIcon = document.getElementById('inputTypeIcon');
+        const inputTypeText = document.getElementById('inputTypeText');
+
+        // Fonction pour détecter si l'input est une URL ou des termes de recherche
+        function detectInputType(input) {
+            const trimmed = input.trim();
+            if (!trimmed) {
+                return null;
+            }
+            
+            // Patterns pour détecter une URL
+            const urlPatterns = [
+                /^https?:\/\//i,  // http:// ou https://
+                /^www\./i,        // www.
+                /\.(com|org|net|fr|eu|io|co|uk|de|es|it)(\/|$)/i  // domaines avec extensions
+            ];
+            
+            const looksLikeUrl = urlPatterns.some(pattern => pattern.test(trimmed));
+            
+            return looksLikeUrl ? 'url' : 'search_terms';
+        }
+
+        // Fonction pour mettre à jour l'indicateur de type
+        function updateInputTypeIndicator() {
+            const input = urlInput.value.trim();
+            const type = detectInputType(input);
+            
+            if (!input || !type) {
+                inputTypeIndicator.style.display = 'none';
+                return;
+            }
+            
+            inputTypeIndicator.style.display = 'flex';
+            
+            if (type === 'url') {
+                inputTypeIcon.innerHTML = '<i class="fas fa-link"></i>';
+                inputTypeText.textContent = 'URL détectée';
+            } else {
+                inputTypeIcon.innerHTML = '<i class="fas fa-search"></i>';
+                inputTypeText.textContent = 'Termes de recherche';
+            }
+        }
 
         // Désactiver le bouton tant que la clé API n'est pas chargée
         scrapeBtn.disabled = true;
@@ -367,6 +444,10 @@
             }
         });
 
+        // Détecter le type d'input en temps réel
+        urlInput.addEventListener('input', updateInputTypeIndicator);
+        urlInput.addEventListener('paste', () => setTimeout(updateInputTypeIndicator, 10));
+
         // Initialiser le panneau de debug
         document.getElementById('toggleDebugBtn').addEventListener('click', toggleDebugPanel);
         document.getElementById('clearDebugBtn').addEventListener('click', clearDebugConsole);
@@ -376,6 +457,16 @@
         document.getElementById('closeModal').addEventListener('click', closeModal);
         document.getElementById('prevScreenshot').addEventListener('click', () => navigateScreenshot(-1));
         document.getElementById('nextScreenshot').addEventListener('click', () => navigateScreenshot(1));
+
+        // Initialiser le bouton de retry avec termes personnalisés
+        document.getElementById('retryWithCustomBtn').addEventListener('click', handleRetryWithCustomTerms);
+        
+        // Permettre de soumettre avec Entrée dans le champ de termes personnalisés
+        document.getElementById('customSearchTerms').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                handleRetryWithCustomTerms();
+            }
+        });
 
         // Fermer le modal en cliquant en dehors
         document.getElementById('screenshotModal').addEventListener('click', (e) => {
@@ -413,12 +504,12 @@
         });
 
         async function handleScrape() {
-            const url = urlInput.value.trim();
-            debugLog('Début du scraping', { url, hasApiKey: !!API_KEY });
+            const input = urlInput.value.trim();
+            debugLog('Début du scraping', { input, hasApiKey: !!API_KEY });
 
-            if (!url) {
-                debugLog('URL vide détectée');
-                alert('Veuillez entrer une URL');
+            if (!input) {
+                debugLog('Input vide détecté');
+                alert('Veuillez entrer une URL ou des termes de recherche');
                 return;
             }
 
@@ -429,13 +520,30 @@
             }
 
             try {
+                // Détecter le type d'input
+                const inputType = detectInputType(input);
+                
+                if (!inputType) {
+                    alert('Type d\'input non détecté');
+                    return;
+                }
+
+                debugLog('Type détecté', { inputType, input });
+
+                // Stocker l'input pour le retry si nécessaire
+                currentUrl = input;
+                
                 debugLog('Création du job de scraping...');
-                showStatus('Création du job de scraping...');
+                showStatus(inputType === 'url' ? 'Création du job de scraping...' : 'Recherche avec termes personnalisés...');
 
                 // Afficher l'indicateur d'étape
                 document.getElementById('currentStepIndicator').style.display = 'block';
 
-                const requestData = { url };
+                // Préparer les données selon le type détecté
+                const requestData = inputType === 'url' 
+                    ? { url: input }
+                    : { url: '', search_terms: input };  // URL vide si ce sont des termes de recherche
+                
                 debugLog('Données de requête', requestData);
 
                 const response = await fetch(`${API_BASE}/scrape`, {
@@ -480,6 +588,70 @@
         let lastScreenshotCount = 0;
         let currentScreenshots = [];
         let currentModalIndex = 0;
+        let currentUrl = null; // Garder l'URL actuelle pour les retry
+
+        // Fonction pour gérer le retry avec des termes personnalisés
+        async function handleRetryWithCustomTerms() {
+            const customTerms = document.getElementById('customSearchTerms').value.trim();
+            
+            if (!customTerms) {
+                alert('Veuillez entrer des termes de recherche');
+                return;
+            }
+
+            if (!currentUrl) {
+                alert('Erreur: URL manquante');
+                return;
+            }
+
+            try {
+                debugLog('Retry avec termes personnalisés', { customTerms, url: currentUrl });
+                showStatus('Relance avec termes personnalisés...');
+                
+                // Masquer la section de retry
+                document.getElementById('retrySection').style.display = 'none';
+                
+                // Afficher l'indicateur d'étape
+                document.getElementById('currentStepIndicator').style.display = 'block';
+                
+                // Créer une nouvelle requête avec l'URL stockée
+                const requestData = { url: currentUrl, search_terms: customTerms };
+                debugLog('Données de retry', requestData);
+
+                const response = await fetch(`${API_BASE}/scrape`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-API-Key': API_KEY
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                debugLog('Réponse retry', {
+                    status: response.status,
+                    ok: response.ok
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
+                const data = await response.json();
+                debugLog('Données de retry', data);
+
+                if (data.job_id) {
+                    debugLog('Job retry créé', { jobId: data.job_id });
+                    showStatus('Relance en cours...');
+                    pollJobStatus(data.job_id);
+                } else {
+                    throw new Error(data.message || 'Erreur lors du retry');
+                }
+            } catch (error) {
+                debugLog('Erreur dans handleRetryWithCustomTerms', error);
+                showStatus(`Erreur: ${error.message}`, 'error');
+            }
+        }
 
         function pollJobStatus(jobId) {
             const maxAttempts = 120; // Augmenté pour couvrir des traitements plus longs (jusqu'à ~6 min)
@@ -544,8 +716,11 @@
                         // Masquer l'indicateur d'étape
                         document.getElementById('currentStepIndicator').style.display = 'none';
                     } else {
-                        const statusMsg = `🔄 Traitement en cours... (${getReadableStatus(data.status)}) - ${elapsed}s écoulé`;
-                        debugLog('Job en cours', { status: data.status, attempts, elapsed });
+                        // Utiliser current_step et step_description si disponibles
+                        const currentStep = data.current_step || data.status;
+                        const stepDescription = data.step_description || getReadableStatus(currentStep);
+                        const statusMsg = `⚙️ ${stepDescription} - ${elapsed}s écoulé`;
+                        debugLog('Job en cours', { status: data.status, currentStep, stepDescription, elapsed });
                         showStatus(statusMsg);
                         attempts++;
                         if (attempts < maxAttempts) {
@@ -570,6 +745,8 @@
             const statusMap = {
                 'pending': 'En attente',
                 'processing': 'Traitement',
+                'extracting_title': 'Extraction du titre',
+                'preparing': 'Préparation',
                 'searching': 'Recherche en cours',
                 'downloading': 'Téléchargement',
                 'generating_pdf': 'Génération PDF',
@@ -582,7 +759,12 @@
         function updateCurrentStep(jobData) {
             const stepIndicator = document.getElementById('currentStepIndicator');
             if (stepIndicator) {
-                const status = getReadableStatus(jobData.status);
+                // Utiliser current_step si disponible, sinon status
+                const currentStep = jobData.current_step || jobData.status;
+                const status = getReadableStatus(currentStep);
+                
+                // Utiliser step_description si disponible
+                const stepDescription = jobData.step_description || status;
 
                 // Afficher les informations de debug dans la console aussi
                 if (jobData.search_terms) {
@@ -603,7 +785,7 @@
 
                 stepIndicator.innerHTML = `
                     <div class="current-step">
-                        <h3>Étape actuelle: ${status}</h3>
+                        <h3>⚙️ ${stepDescription}</h3>
                         ${jobData.search_terms ? `<p><strong>🔍 Termes:</strong> ${jobData.search_terms}</p>` : ''}
                         ${jobData.extracted_title ? `<p><strong>📄 Titre:</strong> ${jobData.extracted_title.substring(0, 80)}...</p>` : ''}
                         ${jobData.search_results_count !== undefined ? `<p><strong>🔎 Résultats:</strong> ${jobData.search_results_count} articles trouvés</p>` : ''}
@@ -748,10 +930,22 @@
             statusSection.style.display = 'block';
             
             const statusCard = statusSection.querySelector('.status-card');
+            const spinner = statusCard.querySelector('.spinner');
+            const retrySection = document.getElementById('retrySection');
+            
             if (type === 'error') {
+                statusCard.classList.add('error');
                 statusCard.style.borderColor = '#e74c3c';
+                // Afficher la section de retry si c'est une erreur de recherche
+                if (retrySection && message.includes('Aucun résultat')) {
+                    retrySection.style.display = 'block';
+                } else {
+                    retrySection.style.display = 'none';
+                }
             } else {
+                statusCard.classList.remove('error');
                 statusCard.style.borderColor = '#3498db';
+                retrySection.style.display = 'none';
             }
         }
 

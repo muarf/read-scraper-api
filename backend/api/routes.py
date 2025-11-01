@@ -33,40 +33,52 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
         """Créer un nouveau job de scraping"""
         data = request.get_json()
         
-        if not data or 'url' not in data:
+        # Accepter soit une URL, soit des search_terms
+        url = data.get('url', '').strip() if data else ''
+        search_terms = data.get('search_terms', '').strip() if data else ''
+        
+        # Vérifier qu'au moins l'un des deux est fourni
+        if not url and not search_terms:
             return jsonify({
-                'error': 'URL manquante',
-                'message': 'Vous devez fournir une URL à scraper'
+                'error': 'Paramètres manquants',
+                'message': 'Vous devez fournir soit une URL, soit des termes de recherche'
             }), 400
         
-        url = data['url']
-        
-        # Vérifier le cache
-        cached_article = cache_service.is_cached(url)
-        if cached_article:
-            logger.info(f"Cache hit pour URL: {url}")
-            return jsonify({
-                'job_id': None,
-                'status': 'completed',
-                'article_id': cached_article['id'],
-                'cached': True
-            })
+        # Si on a une URL, vérifier le cache
+        if url:
+            cached_article = cache_service.is_cached(url)
+            if cached_article:
+                logger.info(f"Cache hit pour URL: {url}")
+                return jsonify({
+                    'job_id': None,
+                    'status': 'completed',
+                    'article_id': cached_article['id'],
+                    'cached': True
+                })
         
         # Créer un nouveau job
+        # Si pas d'URL mais des search_terms, utiliser une URL placeholder
+        job_url = url if url else f"search_terms:{search_terms[:50]}"
         job_id = generate_id(12)
         
-        if not db.create_job(job_id, url):
+        if not db.create_job(job_id, job_url):
             return jsonify({
                 'error': 'Erreur création job',
                 'message': 'Impossible de créer le job de scraping'
             }), 500
         
-        logger.info(f"Job créé: {job_id} pour URL: {url}")
+        # Stocker les termes de recherche personnalisés si fournis (priorité aux search_terms fournis)
+        if search_terms:
+            db.update_job_data(job_id, {'custom_search_terms': search_terms})
+            logger.info(f"Termes de recherche personnalisés stockés pour job {job_id}")
+        
+        logger.info(f"Job créé: {job_id} - URL: {url or '(termes de recherche uniquement)'}, search_terms: {search_terms or '(extraction automatique)'}")
         
         return jsonify({
             'job_id': job_id,
             'status': 'pending',
-            'url': url,
+            'url': url or None,
+            'search_terms': search_terms or None,
             'message': 'Job de scraping créé avec succès'
         }), 201
     
@@ -247,6 +259,9 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
                 if name_without_ext.startswith('before_search_'):
                     screenshot_type = 'before_search'
                     remaining = name_without_ext.replace('before_search_', '', 1)
+                elif name_without_ext.startswith('after_input_'):
+                    screenshot_type = 'after_input'
+                    remaining = name_without_ext.replace('after_input_', '', 1)
                 elif name_without_ext.startswith('search_failed_'):
                     screenshot_type = 'search_failed'
                     remaining = name_without_ext.replace('search_failed_', '', 1)

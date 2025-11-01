@@ -4,6 +4,7 @@ Service de scraping intégrant le code existant
 import os
 import sys
 import time
+import json
 from pathlib import Path
 import urllib.parse as urlp
 from backend.models.database import Database
@@ -18,7 +19,7 @@ from web_scraper.chrome_driver_login import login_to_target_site
 from web_scraper.chrome_driver_search import search_target_site
 from web_scraper.extract_title import extract_title
 from web_scraper.download_article import download_article, sanitize_filename
-from common.utils import generate_id, file_exists
+from common.utils import generate_id, file_exists, NoResultException
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import os
@@ -68,20 +69,60 @@ class ScraperService:
         html = re.sub(r'class="hlterms"', '', html)
         return html
 
+    def _clean_search_terms(self, terms: str) -> str:
+        """
+        Nettoie les termes de recherche personnalisés de la même manière que extract_title.
+        Supprime la ponctuation et normalise les caractères spéciaux.
+        """
+        import string
+        
+        # 1) Normaliser les apostrophes et guillemets typographiques (comme extract_title)
+        # Remplacer les apostrophes typographiques par des apostrophes simples
+        terms_cleaned = (
+            terms
+            .replace("'", "'")
+            .replace("'", "'")
+            .replace(""", '"')
+            .replace(""", '"')
+        )
+        
+        # 2) Supprimer la ponctuation (y compris les slashes) - exactement comme extract_title
+        extra_punct = "…–—«»\"\"''/"
+        punctuation_chars = string.punctuation + extra_punct
+        terms_no_punct = terms_cleaned.translate(str.maketrans(punctuation_chars, ' ' * len(punctuation_chars)))
+        
+        # 3) Nettoyer les espaces multiples et trim
+        terms_cleaned = ' '.join(terms_no_punct.split())
+        
+        return terms_cleaned
+
     def _init_browser(self):
         """Initialiser le navigateur Chrome"""
         logger.info("[BROWSER_INIT] Début initialisation navigateur")
+        
+        # Recharger dynamiquement CHROME_PATH depuis le fichier de config pour utiliser la configuration mise à jour
+        import backend.config.settings as settings_module
+        from backend.config.settings import load_browser_config
+        
+        # Recharger depuis le fichier si disponible
+        saved_path = load_browser_config()
+        if saved_path:
+            settings_module.CHROME_PATH = saved_path
+            logger.info(f"[BROWSER_INIT] Configuration rechargée depuis le fichier: {saved_path}")
+        
+        current_chrome_path = settings_module.CHROME_PATH
+        
         chrome_options = Options()
-        chrome_options.binary_location = CHROME_PATH
-        logger.info(f"[BROWSER_INIT] Chrome path: {CHROME_PATH}")
+        chrome_options.binary_location = current_chrome_path
+        logger.info(f"[BROWSER_INIT] Chrome path: {current_chrome_path}")
         
         # Utiliser le chromedriver local
-        chromedriver_path = CHROMEDRIVER_PATH
+        chromedriver_path = settings_module.CHROMEDRIVER_PATH
         logger.info(f"Tentative d'utilisation du chromedriver: {chromedriver_path}")
         if os.path.exists(chromedriver_path) and os.path.isfile(chromedriver_path):
             from selenium.webdriver.chrome.service import Service
             logger.info(f"Chromedriver trouvé: {chromedriver_path}")
-            service = Service(CHROMEDRIVER_PATH)
+            service = Service(chromedriver_path)
             
             # Mode headless activé pour éviter les problèmes d'affichage en environnement serveur
             if HEADLESS:
@@ -240,32 +281,73 @@ class ScraperService:
 
             browser = None  # Navigateur potentiel pour l'extraction du titre
 
-            # Étape 1: Extraire le titre (essaie sans navigateur d'abord)
-            logger.info(f"[{job_id}] === ÉTAPE 1: Extraction du titre ===")
-            result = extract_title(url)  # Essaie sans navigateur d'abord
-            logger.info(f"[{job_id}] Résultat extract_title sans navigateur: {result}")
+            # Vérifier si des termes de recherche personnalisés ont été fournis
+            job = self.db.get_job(job_id)
+            job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
+            custom_search_terms = job_data.get('custom_search_terms')
+            
+            # Détecter si c'est un job avec seulement des search_terms (URL placeholder)
+            is_search_terms_only = url.startswith('search_terms:') if url else False
+            
+            # Extraire les termes depuis l'URL placeholder si nécessaire
+            if is_search_terms_only and not custom_search_terms:
+                # Extraire depuis le placeholder "search_terms:termes..."
+                custom_search_terms = url.replace('search_terms:', '', 1) if url.startswith('search_terms:') else ''
+                # Stocker dans les données du job
+                if custom_search_terms:
+                    self.db.update_job_data(job_id, {'custom_search_terms': custom_search_terms})
+            
+            # Utiliser les termes personnalisés si fournis OU si c'est un job search_terms uniquement
+            if custom_search_terms:
+                logger.info(f"[{job_id}] === Utilisation de termes de recherche personnalisés ===")
+                logger.info(f"[{job_id}] Termes bruts: '{custom_search_terms}'")
+                
+                # Mettre à jour l'étape actuelle
+                self.db.update_job_data(job_id, {
+                    'current_step': 'preparing',
+                    'step_description': 'Préparation des termes de recherche...'
+                })
+                
+                # Nettoyer les termes personnalisés comme extract_title le fait
+                query = self._clean_search_terms(custom_search_terms)
+                title = custom_search_terms  # Le titre d'affichage reste tel quel
+                logger.info(f"[{job_id}] Termes personnalisés nettoyés: '{query}'")
+            else:
+                # Étape 1: Extraire le titre (essaie sans navigateur d'abord)
+                logger.info(f"[{job_id}] === ÉTAPE 1: Extraction du titre ===")
+                
+                # Mettre à jour l'étape actuelle
+                self.db.update_job_data(job_id, {
+                    'current_step': 'extracting_title',
+                    'step_description': 'Analyse de l\'URL et extraction du titre...'
+                })
+                
+                result = extract_title(url)  # Essaie sans navigateur d'abord
+                logger.info(f"[{job_id}] Résultat extract_title sans navigateur: {result}")
 
-            # Si échec, essayer avec un navigateur
-            if result is None:
-                logger.info(f"[{job_id}] Échec sans navigateur, création pour titre")
-                browser = self._get_browser()
-                result = extract_title(url, browser)
-                logger.info(f"[{job_id}] Résultat extract_title avec navigateur: {result}")
+                # Si échec, essayer avec un navigateur
+                if result is None:
+                    logger.info(f"[{job_id}] Échec sans navigateur, création pour titre")
+                    browser = self._get_browser()
+                    result = extract_title(url, browser)
+                    logger.info(f"[{job_id}] Résultat extract_title avec navigateur: {result}")
 
-            if result is None:
-                logger.error(f"[{job_id}] Impossible d'extraire le titre de l'URL {url} - site protégé par Cloudflare ou indisponible")
-                # Essayer une approche alternative : utiliser l'URL elle-même comme titre
-                parsed_url = urlp.urlparse(url)
-                fallback_title = parsed_url.path.strip('/').replace('-', ' ').replace('_', ' ').title()
-                if fallback_title and len(fallback_title) > 5:
-                    result = (fallback_title, fallback_title)
-                    logger.info(f"[{job_id}] Utilisation du titre de fallback depuis l'URL: {result}")
-                else:
-                    raise Exception(f"Impossible d'extraire le titre de l'URL {url} - protection anti-bot détectée")
+                if result is None:
+                    logger.error(f"[{job_id}] Impossible d'extraire le titre de l'URL {url} - site protégé par Cloudflare ou indisponible")
+                    # Essayer une approche alternative : utiliser l'URL elle-même comme titre
+                    parsed_url = urlp.urlparse(url)
+                    fallback_title = parsed_url.path.strip('/').replace('-', ' ').replace('_', ' ').replace('/', ' ').title()
+                    # Nettoyer les espaces multiples
+                    fallback_title = ' '.join(fallback_title.split())
+                    if fallback_title and len(fallback_title) > 5:
+                        result = (fallback_title, fallback_title)
+                        logger.info(f"[{job_id}] Utilisation du titre de fallback depuis l'URL: {result}")
+                    else:
+                        raise Exception(f"Impossible d'extraire le titre de l'URL {url} - protection anti-bot détectée")
 
-            query, title = result
-            logger.info(f"[{job_id}] Titre extrait: '{title}'")
-            logger.info(f"[{job_id}] Query généré: '{query}'")
+                query, title = result
+                logger.info(f"[{job_id}] Titre extrait: '{title}'")
+                logger.info(f"[{job_id}] Query généré: '{query}'")
 
             # Stocker les termes de recherche dans les données du job
             self.db.update_job_data(job_id, {
@@ -275,6 +357,13 @@ class ScraperService:
 
             # Étape 2: Générer le nom du fichier à partir du query (titre nettoyé)
             logger.info(f"[{job_id}] === ÉTAPE 2: Génération du nom de fichier ===")
+            
+            # Mettre à jour l'étape actuelle
+            self.db.update_job_data(job_id, {
+                'current_step': 'preparing',
+                'step_description': 'Préparation des fichiers...'
+            })
+            
             query_ = query.replace(" ", "_")
             name = (lambda u: urlp.urlparse(u).path.split('/')[-1][:90])(query_)
             logger.info(f"[{job_id}] Query_: '{query_}'")
@@ -401,12 +490,12 @@ class ScraperService:
                 except Exception as ss_error:
                     logger.warning(f"[{job_id}] Impossible de prendre screenshot d'échec: {ss_error}")
 
-                raise Exception("Aucun résultat trouvé pour cet article")
+                raise NoResultException("Aucun résultat trouvé pour cet article")
             
             _, results_data = search_result
             
             if not results_data or len(results_data) == 0:
-                raise Exception("Aucun résultat trouvé")
+                raise NoResultException("Aucun résultat trouvé")
             
             # Déterminer le site source depuis l'URL
             parsed_url = urlp.urlparse(url)
@@ -510,6 +599,9 @@ class ScraperService:
             )
             
             logger.info(f"[{job_id}] Scraping terminé avec succès")
+            
+            # Nettoyer les screenshots de debug maintenant que le job est terminé
+            self._cleanup_job_screenshots(job_id)
             
             return (article_id, {
                 'id': article_id,
