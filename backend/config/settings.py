@@ -8,8 +8,8 @@ from pathlib import Path
 # Chemins - répertoire racine du projet (forcé)
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "scraper.db"
-STATIC_DIR = BASE_DIR / "static"
-LOGS_DIR = BASE_DIR / "logs"
+STATIC_DIR = (BASE_DIR.parent / "static").resolve()
+LOGS_DIR = (BASE_DIR.parent / "logs").resolve()
 
 # Création des répertoires si nécessaire
 for directory in [DB_PATH.parent, STATIC_DIR, LOGS_DIR]:

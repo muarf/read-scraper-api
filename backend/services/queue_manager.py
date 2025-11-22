@@ -57,11 +57,20 @@ class QueueManager:
                         if not self.is_running:
                             break
                         
+                        # Vérifier si le job n'a pas été annulé
+                        current_job = self.db.get_job(job['id'])
+                        if current_job and current_job['status'] == 'cancelled':
+                            logger.info(f"Job {job['id']} ignoré car annulé")
+                            continue
+                        
                         try:
                             self._process_job(job)
                         except Exception as e:
                             logger.error(f"Erreur traitement job {job['id']}: {e}")
-                            self.db.update_job_status(job['id'], 'failed', error=str(e))
+                            # Vérifier à nouveau si le job n'a pas été annulé entre-temps
+                            current_job = self.db.get_job(job['id'])
+                            if current_job and current_job['status'] != 'cancelled':
+                                self.db.update_job_status(job['id'], 'failed', error=str(e))
                 
                 # Attendre avant de vérifier à nouveau
                 time.sleep(1)
@@ -74,6 +83,12 @@ class QueueManager:
         """Traiter un job de scraping"""
         job_id = job['id']
         url = job['url']
+        
+        # Vérifier une dernière fois si le job n'a pas été annulé
+        current_job = self.db.get_job(job_id)
+        if current_job and current_job['status'] == 'cancelled':
+            logger.info(f"Job {job_id} annulé, arrêt du traitement")
+            return
         
         logger.info(f"Début traitement job {job_id} pour URL: {url}")
         

@@ -414,7 +414,7 @@ class CloudDatabase:
             conn.close()
 
     def cleanup_old_data(self, days_articles: int = 90,
-                        days_jobs: int = 7, days_logs: int = 30):
+                        days_jobs: int = 7, days_logs: int = 30, days_static_files: int = 7):
         """Nettoie les anciennes données"""
         conn = self.get_connection()
         cursor = conn.cursor()
@@ -459,9 +459,33 @@ class CloudDatabase:
 
             conn.commit()
 
+            return {
+                'articles_deleted': articles_deleted,
+                'jobs_deleted': jobs_deleted,
+                'files_deleted': 0,  # Les fichiers statiques sont gérés séparément en mode cloud
+                'logs_deleted': logs_deleted
+            }
+
         except Exception as e:
             conn.rollback()
             logger.error(f"Erreur nettoyage: {e}")
+            return {
+                'articles_deleted': 0,
+                'jobs_deleted': 0,
+                'files_deleted': 0,
+                'logs_deleted': 0
+            }
         finally:
             cursor.close()
             conn.close()
+
+    # Méthodes héritées pour compatibilité descendante
+    def cleanup_old_articles(self, days: int = 30) -> int:
+        """Compatibilité avec l'ancienne API qui nettoyait uniquement les articles."""
+        result = self.cleanup_old_data(
+            days_articles=days,
+            days_jobs=0,
+            days_logs=0,
+            days_static_files=0
+        )
+        return result.get('articles_deleted', 0)

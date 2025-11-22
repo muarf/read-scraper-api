@@ -5,10 +5,13 @@ import os
 import sqlite3
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from backend.config.settings import IS_CLOUD_ENV, DB_PATH, STATIC_DIR
+
+logger = logging.getLogger(__name__)
 
 # Factory function pour créer la bonne base de données
 def create_database():
@@ -261,6 +264,21 @@ class Database:
                     WHERE id = ?
                 """, (status, error, datetime.now(), job_id))
             
+            elif status == 'cancelled':
+                cursor.execute("""
+                    UPDATE scraping_jobs 
+                    SET status = ?, error_message = ?, completed_at = ?
+                    WHERE id = ?
+                """, (status, error or 'Job annulé par l\'utilisateur', datetime.now(), job_id))
+            
+            else:
+                # Pour les autres statuts, mise à jour simple
+                cursor.execute("""
+                    UPDATE scraping_jobs 
+                    SET status = ?
+                    WHERE id = ?
+                """, (status, job_id))
+            
             conn.commit()
             return True
         except Exception as e:
@@ -283,13 +301,13 @@ class Database:
         return None
     
     def get_pending_jobs(self) -> List[Dict[str, Any]]:
-        """Récupérer tous les jobs en attente"""
+        """Récupérer les jobs en attente (excluant les annulés)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
             SELECT * FROM scraping_jobs 
-            WHERE status = 'pending'
+            WHERE status = 'pending' AND status != 'cancelled'
             ORDER BY priority DESC, created_at ASC
         """)
         rows = cursor.fetchall()
@@ -406,10 +424,13 @@ class Database:
         finally:
             conn.close()
     
-    def cleanup_old_data(self, days_articles: int = 90, days_jobs: int = 7):
+    def cleanup_old_data(self, days_articles: int = 90, days_jobs: int = 7, days_static_files: int = 7):
         """Nettoyer les données anciennes"""
         conn = self.get_connection()
         cursor = conn.cursor()
+
+        articles_deleted = 0
+        jobs_deleted = 0
         
         cutoff_date_articles = datetime.now() - timedelta(days=days_articles)
         cutoff_date_jobs = datetime.now() - timedelta(days=days_jobs)
@@ -419,17 +440,68 @@ class Database:
             DELETE FROM articles 
             WHERE created_at < ?
         """, (cutoff_date_articles,))
+        articles_deleted = cursor.rowcount
         
         # Supprimer anciens jobs
         cursor.execute("""
             DELETE FROM scraping_jobs 
             WHERE created_at < ?
         """, (cutoff_date_jobs,))
+        jobs_deleted = cursor.rowcount
         
         conn.commit()
         conn.close()
         
-        return cursor.rowcount
+        files_deleted = self._cleanup_static_files(days_static_files)
+
+        if any([articles_deleted, jobs_deleted, files_deleted]):
+            logger.info(
+                "Nettoyage terminé: %s articles, %s jobs, %s fichiers supprimés",
+                articles_deleted,
+                jobs_deleted,
+                files_deleted
+            )
+        
+        return {
+            'articles_deleted': articles_deleted,
+            'jobs_deleted': jobs_deleted,
+            'files_deleted': files_deleted,
+            'logs_deleted': 0
+        }
+
+    def _cleanup_static_files(self, days_static_files: int) -> int:
+        """Supprimer les fichiers statiques (HTML/PDF) plus anciens que la limite"""
+        cutoff_date = datetime.now() - timedelta(days=days_static_files)
+        files_deleted = 0
+
+        if not STATIC_DIR.exists():
+            return 0
+
+        for pattern in ("*.html", "*.pdf"):
+            for file_path in STATIC_DIR.glob(pattern):
+                try:
+                    file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                    if file_mtime < cutoff_date:
+                        file_path.unlink()
+                        files_deleted += 1
+                        logger.debug("Fichier statique supprimé: %s", file_path)
+                except FileNotFoundError:
+                    # Le fichier peut avoir été supprimé par un autre processus
+                    continue
+                except Exception as e:
+                    logger.warning("Impossible de supprimer %s: %s", file_path, e)
+
+        return files_deleted
+
+    # Méthodes héritées pour compatibilité descendante
+    def cleanup_old_articles(self, days: int = 30) -> int:
+        """Compatibilité avec l'ancienne API qui nettoyait uniquement les articles."""
+        result = self.cleanup_old_data(
+            days_articles=days,
+            days_jobs=0,
+            days_static_files=0
+        )
+        return result.get('articles_deleted', 0)
     
     def verify_admin_password(self, password: str) -> bool:
         """Vérifier un mot de passe admin"""

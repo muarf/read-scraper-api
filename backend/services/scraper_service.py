@@ -269,9 +269,6 @@ class ScraperService:
         Returns:
             tuple: (article_id, article_data) ou None en cas d'erreur
         """
-        # Nettoyer les screenshots du job précédent
-        self._cleanup_job_screenshots(job_id)
-
         # S'assurer que le navigateur est initialisé
         self._ensure_browser()
 
@@ -283,6 +280,8 @@ class ScraperService:
 
             # Vérifier si des termes de recherche personnalisés ont été fournis
             job = self.db.get_job(job_id)
+            if job and job.get('status') == 'completed':
+                self._cleanup_job_screenshots(job_id)
             job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
             custom_search_terms = job_data.get('custom_search_terms')
             
