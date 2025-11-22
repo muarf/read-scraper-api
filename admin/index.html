@@ -200,10 +200,219 @@
         </div>
     </div>
 
+    <div id="jobDetailModal" class="modal-overlay">
+        <div class="job-modal">
+            <div class="job-modal-header">
+                <h2 id="jobDetailTitle">Job</h2>
+                <button id="jobModalClose" class="modal-close-btn" aria-label="Fermer">
+                    &times;
+                </button>
+            </div>
+            <div class="job-modal-body">
+                <div id="jobDetailMeta" class="job-meta-grid">
+                    <p class="job-loading">Sélectionnez un job pour afficher les détails.</p>
+                </div>
+
+                <div class="job-section">
+                    <h3>Données supplémentaires</h3>
+                    <div id="jobDetailData" class="job-data-grid">
+                        <p class="empty-state">Aucune donnée à afficher.</p>
+                    </div>
+                </div>
+
+                <div class="job-section">
+                    <h3>Logs</h3>
+                    <ul id="jobLogs" class="job-log-list">
+                        <li class="empty-state">Aucun log disponible.</li>
+                    </ul>
+                </div>
+
+                <div class="job-section">
+                    <h3>Screenshots</h3>
+                    <div id="jobScreenshots" class="job-screens-grid">
+                        <p class="empty-state">Aucun screenshot pour ce job.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_KEY = 'i-Au-D25qOqX9LMopB7wHJR8lM-HVHso';
         // Utiliser l'URL relative pour fonctionner avec n'importe quel hôte
         const API_BASE = window.location.origin + '/api/v1';
+        
+        const jobDetailModal = document.getElementById('jobDetailModal');
+        const jobDetailTitle = document.getElementById('jobDetailTitle');
+        const jobDetailMeta = document.getElementById('jobDetailMeta');
+        const jobDetailData = document.getElementById('jobDetailData');
+        const jobLogsList = document.getElementById('jobLogs');
+        const jobScreenshotsContainer = document.getElementById('jobScreenshots');
+        const jobModalCloseBtn = document.getElementById('jobModalClose');
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function sanitizeStatus(status) {
+            return (status || 'unknown')
+                .toString()
+                .toLowerCase()
+                .replace(/[^a-z0-9_-]/g, '') || 'unknown';
+        }
+
+        function formatDateTime(value) {
+            if (!value) return '-';
+            try {
+                if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+                    return new Date(Number(value) * 1000).toLocaleString();
+                }
+                return new Date(value).toLocaleString();
+            } catch (error) {
+                return String(value);
+            }
+        }
+
+        function formatDataValue(value) {
+            if (value === null || value === undefined) {
+                return '<span class="empty-state">-</span>';
+            }
+
+            if (typeof value === 'object') {
+                return `<pre>${escapeHtml(JSON.stringify(value, null, 2))}</pre>`;
+            }
+
+            return `<code>${escapeHtml(String(value))}</code>`;
+        }
+
+        function closeJobModal() {
+            jobDetailModal.classList.remove('active');
+            document.body.classList.remove('modal-open');
+        }
+
+        jobModalCloseBtn.addEventListener('click', closeJobModal);
+        jobDetailModal.addEventListener('click', (event) => {
+            if (event.target === jobDetailModal) {
+                closeJobModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && jobDetailModal.classList.contains('active')) {
+                closeJobModal();
+            }
+        });
+
+        function renderJobDetails(payload) {
+            const job = payload.job || {};
+            const logs = payload.logs || [];
+            const screenshots = payload.screenshots || [];
+
+            jobDetailTitle.textContent = `Job ${job.id || ''}`;
+
+            const metaItems = [
+                { label: 'Job ID', value: escapeHtml(job.id || '-') },
+                { label: 'Statut', value: job.status ? `<span class="badge badge-${sanitizeStatus(job.status)}">${escapeHtml(job.status)}</span>` : '-' },
+                { label: 'URL', value: job.url ? `<a href="${escapeHtml(job.url)}" target="_blank" rel="noopener">${escapeHtml(job.url)}</a>` : '-' },
+                { label: 'Article ID', value: job.article_id ? escapeHtml(job.article_id) : '-' },
+                { label: 'Créé le', value: escapeHtml(formatDateTime(job.created_at)) },
+                { label: 'Démarré le', value: escapeHtml(formatDateTime(job.started_at)) },
+                { label: 'Terminé le', value: escapeHtml(formatDateTime(job.completed_at)) }
+            ];
+
+            if (job.error_message) {
+                metaItems.push({ label: 'Erreur', value: `<code>${escapeHtml(job.error_message)}</code>` });
+            }
+
+            jobDetailMeta.innerHTML = metaItems.map(item => `
+                <div class="job-meta-item">
+                    <span class="label">${item.label}</span>
+                    <span class="value">${item.value}</span>
+                </div>
+            `).join('');
+
+            const jobData = job.data && typeof job.data === 'object' ? job.data : {};
+            const dataEntries = Object.entries(jobData);
+            if (!dataEntries.length) {
+                jobDetailData.innerHTML = '<p class="empty-state">Aucune donnée supplémentaire pour ce job.</p>';
+            } else {
+                jobDetailData.innerHTML = dataEntries.map(([key, value]) => `
+                    <div class="job-data-item">
+                        <span class="job-data-key">${escapeHtml(key)}</span>
+                        <div class="job-data-value">${formatDataValue(value)}</div>
+                    </div>
+                `).join('');
+            }
+
+            if (!logs.length) {
+                jobLogsList.innerHTML = '<li class="empty-state">Aucun log enregistré pour ce job.</li>';
+            } else {
+                jobLogsList.innerHTML = logs.map(line => {
+                    const separatorIndex = line.indexOf(' - ');
+                    let timestamp = '';
+                    let remainder = line;
+                    if (separatorIndex !== -1) {
+                        timestamp = line.slice(0, separatorIndex);
+                        remainder = line.slice(separatorIndex + 3);
+                    }
+                    return `<li>${timestamp ? `<span class="log-time">${escapeHtml(timestamp)}</span>` : ''}<span class="log-text">${escapeHtml(remainder)}</span></li>`;
+                }).join('');
+            }
+
+            if (!screenshots.length) {
+                jobScreenshotsContainer.innerHTML = '<p class="empty-state">Aucun screenshot pour ce job.</p>';
+            } else {
+                jobScreenshotsContainer.innerHTML = screenshots.map(screenshot => {
+                    const displayDate = formatDateTime(screenshot.datetime || screenshot.timestamp);
+                    const sizeLabel = screenshot.size ? `${Math.round(screenshot.size / 1024)} KB` : '';
+                    const cacheBustingUrl = `${screenshot.url}?v=${screenshot.timestamp || Date.now()}`;
+                    return `
+                        <a class="job-screenshot-card" href="${escapeHtml(screenshot.url)}" target="_blank" rel="noopener">
+                            <img src="${escapeHtml(cacheBustingUrl)}" alt="Screenshot ${escapeHtml(screenshot.type || '')}">
+                            <div class="job-screenshot-meta">
+                                <span class="type">${escapeHtml((screenshot.type || '').replace(/_/g, ' '))}</span>
+                                <span class="info">${escapeHtml(displayDate)}${sizeLabel ? ' · ' + escapeHtml(sizeLabel) : ''}</span>
+                            </div>
+                        </a>
+                    `;
+                }).join('');
+            }
+        }
+
+        async function openJobDetails(jobId) {
+            jobDetailModal.classList.add('active');
+            document.body.classList.add('modal-open');
+
+            jobDetailTitle.textContent = `Job ${jobId}`;
+            jobDetailMeta.innerHTML = '<p class="job-loading">Chargement des détails...</p>';
+            jobDetailData.innerHTML = '';
+            jobLogsList.innerHTML = '';
+            jobScreenshotsContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/admin/job/${encodeURIComponent(jobId)}`, {
+                    headers: { 'X-API-Key': API_KEY }
+                });
+
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => ({}));
+                    throw new Error(errorPayload.message || `Erreur ${response.status}`);
+                }
+
+                const payload = await response.json();
+                renderJobDetails(payload);
+            } catch (error) {
+                jobDetailMeta.innerHTML = `<p class="error-text">${escapeHtml(error.message || 'Impossible de récupérer les détails du job')}</p>`;
+                jobDetailData.innerHTML = '<p class="empty-state">Aucune donnée disponible.</p>';
+                jobLogsList.innerHTML = '<li class="empty-state">Aucun log disponible.</li>';
+                jobScreenshotsContainer.innerHTML = '<p class="empty-state">Aucun screenshot.</p>';
+            }
+        }
         
         // Vérifier si l'utilisateur est déjà connecté
         if (!sessionStorage.getItem('adminLoggedIn')) {
@@ -269,6 +478,16 @@
             });
         });
 
+        // Charger automatiquement les données de l'onglet actif au démarrage
+        window.addEventListener('DOMContentLoaded', () => {
+            const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+            if (activeTab === 'stats') loadStats();
+            else if (activeTab === 'articles') loadArticles();
+            else if (activeTab === 'jobs') loadJobs();
+            else if (activeTab === 'apikeys') loadApiKeys();
+            else if (activeTab === 'settings') loadSettings();
+        });
+
         async function loadStats() {
             try {
                 const response = await fetch(`${API_BASE}/admin/stats`, {
@@ -314,18 +533,35 @@
 
                 data.articles.forEach(article => {
                     const row = tbody.insertRow();
-                    row.innerHTML = `
-                        <td>${article.title || 'Sans titre'}</td>
-                        <td>${article.site_source || '-'}</td>
-                        <td>${new Date(article.created_at).toLocaleString()}</td>
-                        <td>
-                            <button class="btn-icon" data-article-id="${article.id.replace(/"/g, '&quot;')}" onclick="deleteArticle(this)" title="Supprimer">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                            <a href="/api/v1/article/${article.id.replace(/"/g, '&quot;')}/pdf" class="btn-icon" download title="Télécharger PDF">
-                                <i class="fas fa-download"></i>
-                            </a>
-                        </td>
+                    // Rendre le titre cliquable pour voir l'article
+                    const titleCell = row.insertCell(0);
+                    const titleLink = document.createElement('a');
+                    titleLink.href = `/article/${article.id}`;
+                    titleLink.textContent = article.title || 'Sans titre';
+                    titleLink.style.cursor = 'pointer';
+                    titleLink.style.color = '#3498db';
+                    titleLink.style.textDecoration = 'none';
+                    titleLink.onmouseover = () => titleLink.style.textDecoration = 'underline';
+                    titleLink.onmouseout = () => titleLink.style.textDecoration = 'none';
+                    titleCell.appendChild(titleLink);
+                    
+                    // Source
+                    const sourceCell = row.insertCell(1);
+                    sourceCell.textContent = article.site_source || '-';
+                    
+                    // Date
+                    const dateCell = row.insertCell(2);
+                    dateCell.textContent = new Date(article.created_at).toLocaleString();
+                    
+                    // Actions
+                    const actionsCell = row.insertCell(3);
+                    actionsCell.innerHTML = `
+                        <button class="btn-icon" data-article-id="${article.id.replace(/"/g, '&quot;')}" onclick="deleteArticle(this)" title="Supprimer">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        <a href="/article/${article.id.replace(/"/g, '&quot;')}/pdf" class="btn-icon" download title="Télécharger PDF">
+                            <i class="fas fa-download"></i>
+                        </a>
                     `;
                 });
             } catch (error) {
@@ -441,20 +677,50 @@
 
                 data.jobs.forEach(job => {
                     const row = tbody.insertRow();
+                    row.classList.add('job-row');
+                    row.dataset.jobId = job.id;
+
+                    const jobIdValue = job.id || '-';
+                    const jobUrl = job.url || '';
+                    const displayUrl = jobUrl ? (jobUrl.length > 60 ? `${jobUrl.slice(0, 57)}...` : jobUrl) : '-';
+                    const statusClass = sanitizeStatus(job.status);
+                    const statusLabel = job.status ? escapeHtml(job.status) : '-';
+                    const createdAt = escapeHtml(formatDateTime(job.created_at));
+                    const completedAt = escapeHtml(formatDateTime(job.completed_at));
+
                     row.innerHTML = `
-                        <td>${job.id}</td>
-                        <td>${job.url.substring(0, 50)}...</td>
-                        <td><span class="badge badge-${job.status}">${job.status}</span></td>
-                        <td>${new Date(job.created_at).toLocaleString()}</td>
-                        <td>${job.completed_at ? new Date(job.completed_at).toLocaleString() : '-'}</td>
+                        <td>${escapeHtml(jobIdValue)}</td>
+                        <td title="${escapeHtml(jobUrl)}">${escapeHtml(displayUrl)}</td>
+                        <td><span class="badge badge-${statusClass}">${statusLabel}</span></td>
+                        <td>${createdAt}</td>
+                        <td>${completedAt}</td>
                         <td>
+                            ${job.status === 'pending' || job.status === 'processing' ? `
+                                <button class="btn-icon job-action-cancel" data-job-id="${escapeHtml(job.id)}" title="Annuler le job" style="background: #e74c3c;">
+                                    <i class="fas fa-stop"></i>
+                                </button>` : ''}
                             ${job.status === 'failed' ? `
-                            <button class="btn-icon" data-job-id="${job.id.replace(/"/g, '&quot;')}" onclick="retryJob(this)" title="Relancer le job" style="background: #f39c12;">
-                                <i class="fas fa-redo"></i>
-                            </button>
-                            ` : ''}
+                                <button class="btn-icon job-action-retry" data-job-id="${escapeHtml(job.id)}" title="Relancer le job" style="background: #f39c12;">
+                                    <i class="fas fa-redo"></i>
+                                </button>` : ''}
                         </td>
                     `;
+
+                    row.addEventListener('click', () => openJobDetails(job.id));
+
+                    row.querySelectorAll('.job-action-cancel').forEach(btn => {
+                        btn.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            cancelJob(btn);
+                        });
+                    });
+
+                    row.querySelectorAll('.job-action-retry').forEach(btn => {
+                        btn.addEventListener('click', (event) => {
+                            event.stopPropagation();
+                            retryJob(btn);
+                        });
+                    });
                 });
             } catch (error) {
                 console.error('Erreur chargement jobs:', error);
@@ -545,14 +811,43 @@
             if (!confirm('Relancer ce job ?')) return;
 
             try {
-                await fetch(`${API_BASE}/admin/job/${encodeURIComponent(jobId)}/retry`, {
+                const response = await fetch(`${API_BASE}/admin/job/${encodeURIComponent(jobId)}/retry`, {
                     method: 'POST',
                     headers: { 'X-API-Key': API_KEY }
                 });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Erreur lors de la relance');
+                }
+                
                 alert('Job relancé avec succès');
                 loadJobs();
             } catch (error) {
-                alert('Erreur lors de la relance du job');
+                alert('Erreur lors de la relance du job: ' + error.message);
+            }
+        }
+
+        async function cancelJob(buttonElement) {
+            const jobId = buttonElement.getAttribute('data-job-id');
+            if (!confirm('Êtes-vous sûr de vouloir annuler ce job ? Le traitement sera interrompu.')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/job/${encodeURIComponent(jobId)}/cancel`, {
+                    method: 'POST',
+                    headers: { 'X-API-Key': API_KEY }
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.message || 'Erreur lors de l\'annulation');
+                }
+                
+                const data = await response.json();
+                alert(data.message || 'Job annulé avec succès');
+                loadJobs();
+            } catch (error) {
+                alert('Erreur lors de l\'annulation du job: ' + error.message);
             }
         }
 
@@ -808,9 +1103,16 @@
         // Charger les stats au démarrage
         loadStats();
 
-        // Charger aussi les clés API pour l'onglet actif
-        if (document.querySelector('.tab-btn.active')?.dataset.tab === 'apikeys') {
+        // Charger automatiquement les données de l'onglet actif au démarrage
+        const activeTab = document.querySelector('.tab-btn.active')?.dataset.tab;
+        if (activeTab === 'articles') {
+            loadArticles();
+        } else if (activeTab === 'jobs') {
+            loadJobs();
+        } else if (activeTab === 'apikeys') {
             loadApiKeys();
+        } else if (activeTab === 'settings') {
+            loadSettings();
         }
     </script>
 </body>

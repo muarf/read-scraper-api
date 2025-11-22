@@ -77,13 +77,16 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 # Initialisation de la base de données
 db = create_database()
 
-# Nettoyer les anciens articles (plus de 30 jours)
-logger.info("Nettoyage des articles de plus de 30 jours...")
-deleted_count = db.cleanup_old_data(days_articles=30)
-if deleted_count > 0:
-    logger.info(f"{deleted_count} anciens articles nettoyés")
+# Nettoyer les anciennes données
+logger.info("Nettoyage des données anciennes (articles + jobs + fichiers statiques)...")
+cleanup_result = db.cleanup_old_data(days_articles=30, days_jobs=7, days_static_files=7)
+if any(cleanup_result.values()):
+    logger.info(
+        "Nettoyage: %(articles_deleted)s articles, %(jobs_deleted)s jobs, %(files_deleted)s fichiers supprimés",
+        cleanup_result
+    )
 else:
-    logger.info("Aucun ancien article à nettoyer")
+    logger.info("Aucune donnée ancienne à nettoyer")
 
 # Initialisation des services
 pdf_service = PDFService()
@@ -169,6 +172,13 @@ def frontend_files(filename):
     frontend_dir = Path(__file__).parent.parent / 'frontend'
     return send_from_directory(str(frontend_dir), filename)
 
+@app.route('/extension')
+def extension_page():
+    """Page d'installation des extensions navigateur"""
+    from pathlib import Path
+    extension_path = Path(__file__).parent.parent / 'frontend' / 'extension.html'
+    return send_file(str(extension_path))
+
 # Route admin
 @app.route('/admin')
 def admin():
@@ -216,6 +226,34 @@ def view_article(article_id):
 def serve_static(filename):
     """Servir les fichiers statiques"""
     return send_from_directory(str(STATIC_DIR), filename)
+
+# Route publique pour télécharger le PDF (pour les liens HTML directs)
+@app.route('/article/<article_id>/pdf')
+def public_download_pdf(article_id):
+    """Télécharger le PDF d'un article (route publique pour les liens HTML)"""
+    article = db.get_article(article_id)
+    
+    if not article:
+        return f"Article {article_id} introuvable", 404
+    
+    pdf_path_str = article['pdf_path']
+    
+    # Si le chemin commence par /static/, le remplacer par le chemin réel du répertoire static
+    if pdf_path_str.startswith('/static/'):
+        filename = pdf_path_str.replace('/static/', '', 1)
+        pdf_path = STATIC_DIR / filename
+    else:
+        pdf_path = Path(pdf_path_str)
+    
+    # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
+    if not pdf_path.is_absolute():
+        pdf_path = STATIC_DIR / pdf_path
+    
+    if not pdf_path.exists():
+        logger.error(f"PDF introuvable: {pdf_path} (chemin original: {pdf_path_str})")
+        return f"Le fichier PDF n'existe pas sur le serveur", 404
+    
+    return send_file(str(pdf_path), mimetype='application/pdf', as_attachment=True, download_name=f"{article_id}.pdf")
 
 # Route pour créer une clé API initiale (une seule fois)
 @app.route('/init', methods=['GET'])

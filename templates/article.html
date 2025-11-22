@@ -7,6 +7,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/frontend/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background: #f5f5f5 !important;
+        }
+        header {
+            color: #333 !important;
+        }
+        header h1 {
+            color: #333 !important;
+        }
+        header p {
+            color: #666 !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -20,13 +34,13 @@
                 <div class="article-preview">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h2>{{ article.title }}</h2>
-                        <a id="pdfLinkTop" href="/static/{{ article.pdf_path.split('/')[-1] }}" class="btn btn-primary" download>
+                        <a id="pdfLinkTop" href="/article/{{ article.id }}/pdf" class="btn btn-primary" download>
                             <i class="fas fa-download"></i> Télécharger le PDF
                         </a>
                     </div>
-                    <div id="articleContent">{{ article.html_content | safe }}</div>
+                    <div id="articleContent"></div>
                     <div class="actions">
-                        <a id="pdfLink" href="/static/{{ article.pdf_path.split('/')[-1] }}" class="btn btn-primary" download>
+                        <a id="pdfLink" href="/article/{{ article.id }}/pdf" class="btn btn-primary" download>
                             <i class="fas fa-download"></i> Télécharger le PDF
                         </a>
                         <button id="rejectBtn" class="btn btn-danger" onclick="rejectArticle()">
@@ -39,7 +53,11 @@
     </div>
 
     <script>
-        let currentJobId = null; // Variable globale pour stocker le job_id
+        // Le job_id est passé directement par le template depuis Flask
+        let currentJobId = null;
+        {% if job_id %}
+        currentJobId = "{{ job_id }}";
+        {% endif %}
 
         // Fonction pour charger l'article depuis l'API
         async function loadArticle(articleId) {
@@ -49,18 +67,20 @@
                 const tempKeyData = await tempKeyResponse.json();
                 const API_KEY = tempKeyData.api_key;
 
-                // Charger les détails du job pour obtenir le job_id
-                const jobResponse = await fetch(`/api/v1/job/${articleId}`, {
-                    headers: { 'X-API-Key': API_KEY }
-                });
+                // Si on n'a pas déjà de job_id depuis le template, essayer de le récupérer
+                if (!currentJobId) {
+                    // Charger les détails de l'article pour trouver le job associé
+                    const articleResponse = await fetch(`/api/v1/article/${articleId}`, {
+                        headers: { 'X-API-Key': API_KEY }
+                    });
 
-                if (!jobResponse.ok) {
-                    throw new Error(`HTTP ${jobResponse.status}: ${jobResponse.statusText}`);
+                    if (articleResponse.ok) {
+                        // Chercher dans les jobs pour trouver celui lié à cet article
+                        // Note: cette méthode nécessiterait un endpoint pour chercher le job par article_id
+                        // Pour l'instant, on utilise le job_id passé par le template
+                        console.log('Article chargé:', articleId);
+                    }
                 }
-
-                const jobData = await jobResponse.json();
-                currentJobId = articleId; // Stocker le job_id pour le rejet
-                console.log('Job data loaded:', jobData);
 
             } catch (error) {
                 console.error('Erreur chargement article:', error);
@@ -70,7 +90,7 @@
         // Fonction pour refuser l'article
         async function rejectArticle() {
             if (!currentJobId) {
-                alert('Aucun job actif trouvé pour cet article');
+                alert('Aucun job actif trouvé pour cet article. Impossible de rejeter l\'article.');
                 return;
             }
 
@@ -106,17 +126,29 @@
             }
         }
 
-        // Charger l'article au chargement de la page
+        // Charger l'article au chargement de la page si nécessaire
         const urlParams = new URLSearchParams(window.location.search);
         const articleId = urlParams.get('id');
         if (articleId) {
             loadArticle(articleId);
         }
 
-        // Le job_id est maintenant passé directement par le template
-        {% if job_id %}
-        currentJobId = "{{ job_id }}";
-        {% endif %}
+        // Nettoyer le HTML de l'article pour remplacer les liens /static/ vers les PDFs
+        (function() {
+            const articleContentDiv = document.getElementById('articleContent');
+            if (articleContentDiv) {
+                {% if article.html_content %}
+                let articleContent = {{ article.html_content | tojson }};
+                // Remplacer les liens /static/...pdf par la route API correcte
+                let cleanContent = articleContent.replace(/href=["']\/static\/([^"']+\.pdf)["']/gi, 
+                    'href="/article/{{ article.id }}/pdf"');
+                // Afficher le contenu nettoyé
+                articleContentDiv.innerHTML = cleanContent;
+                {% else %}
+                articleContentDiv.innerHTML = '<p>Aucun contenu disponible</p>';
+                {% endif %}
+            }
+        })();
     </script>
 </body>
 </html>

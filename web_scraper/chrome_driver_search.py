@@ -85,12 +85,67 @@ def search_target_site(socketio, app, driver, query, title,session_id):
         # Soumettre le formulaire
         send_message_to_client(socketio, app,"Soumission du formulaire de recherche...", session_id)
         driver.execute_script("arguments[0].click();", submit_button)
-        # Attendre un certain temps pour que les résultats de la recherche se chargent
+        
+        # Attendre que les résultats de la recherche se chargent
         try:
-            # Attendre un certain temps pour que les résultats de la recherche se chargent
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CLASS_NAME, 'v-virtual-scroll__item'))
-            )
+            send_message_to_client(socketio, app,"Attente du chargement des résultats...", session_id)
+            
+            # Attendre que les placeholders disparaissent (skeleton loaders)
+            # Les placeholders ont généralement des classes comme 'v-skeleton-loader' ou sont des divs gris
+            wait = WebDriverWait(driver, 30)  # Augmenter le timeout à 30 secondes
+            
+            # Attendre que les résultats réels apparaissent (pas juste les placeholders)
+            # On vérifie que les éléments ont du contenu réel (titre, logo, etc.)
+            class ResultsLoaded:
+                """Classe callable pour vérifier que les résultats sont réellement chargés"""
+                def __call__(self, driver):
+                    try:
+                        # Chercher les éléments de résultats
+                        result_items = driver.find_elements(By.CLASS_NAME, 'v-virtual-scroll__item')
+                        if len(result_items) == 0:
+                            return False
+                        
+                        # Vérifier que le premier résultat a du contenu réel (titre, logo)
+                        # Les placeholders n'ont généralement pas ces attributs data-qa
+                        for item in result_items[:3]:  # Vérifier les 3 premiers
+                            try:
+                                # Si on peut trouver un titre avec data-qa-itemtype, c'est un vrai résultat
+                                title_elem = item.find_element(By.CSS_SELECTOR, '[data-qa-itemtype="docTitle"]')
+                                if title_elem and title_elem.text.strip():
+                                    # Vérifier aussi qu'il n'est pas vide ou juste des espaces
+                                    if len(title_elem.text.strip()) > 5:  # Au moins 5 caractères
+                                        return True
+                            except:
+                                continue
+                        
+                        return False
+                    except:
+                        return False
+            
+            # Attendre que les résultats soient chargés
+            wait.until(ResultsLoaded())
+            
+            # Attendre un peu plus pour que tous les résultats se chargent
+            # Augmenter le délai pour s'assurer que tout est chargé
+            time.sleep(3)
+            
+            # Vérifier une deuxième fois que les résultats sont toujours là
+            # (parfois les résultats peuvent disparaître temporairement)
+            results_check = driver.find_elements(By.CLASS_NAME, 'v-virtual-scroll__item')
+            if len(results_check) == 0:
+                # Attendre encore un peu si aucun résultat n'est trouvé
+                time.sleep(2)
+                wait.until(ResultsLoaded())
+            
+            # Screenshot après chargement des résultats pour debug
+            try:
+                after_results_screenshot = f"/root/read-scraper-api/static/debug_after_results_{session_id}_{int(time.time())}.png"
+                driver.save_screenshot(after_results_screenshot)
+                print(f"Screenshot après chargement des résultats: {after_results_screenshot}")
+            except Exception as ss_error:
+                print(f"Impossible de prendre screenshot après résultats: {ss_error}")
+            
+            send_message_to_client(socketio, app,"Résultats chargés, extraction en cours...", session_id)
 
             # Récupérer tous les éléments de la liste des résultats
             results = driver.find_elements(By.CLASS_NAME, 'v-virtual-scroll__item')
@@ -153,16 +208,38 @@ def search_target_site(socketio, app, driver, query, title,session_id):
             # Tri des résultats par pourcentage de similarité
             result_data_sorted = sorted(result_data, key=lambda x: x['percentage'], reverse=True)
 
-        except TimeoutException:
+        except TimeoutException as timeout_error:
+            # Screenshot pour debug en cas de timeout
+            try:
+                timeout_screenshot = f"/root/read-scraper-api/static/debug_timeout_{session_id}_{int(time.time())}.png"
+                driver.save_screenshot(timeout_screenshot)
+                print(f"Screenshot en cas de timeout: {timeout_screenshot}")
+            except Exception as ss_error:
+                print(f"Impossible de prendre screenshot timeout: {ss_error}")
+            
             # Si l'élément v-virtual-scroll__item n'est pas présent, vérifier si l'élément no_result_element est présent
             no_result_element = driver.find_elements(By.XPATH, "//div[@data-qa-itemtype='searchResultEmpty']")
             if no_result_element:
-                driver.save_screenshot('ss.png')
                 send_message_to_client(socketio, app, "Aucun résultat trouvé pour la requête",session_id)
                 result_data_sorted = []  # Retourner une liste vide au lieu d'un dict
             else:
-                driver.save_screenshot('ss.png')
-                send_message_to_client(socketio, app, "Erreur lors du chargement des résultats de recherche.", session_id)
+                # Vérifier si on a encore des placeholders (page pas finie de charger)
+                placeholder_items = driver.find_elements(By.CLASS_NAME, 'v-virtual-scroll__item')
+                has_real_content = False
+                for item in placeholder_items[:3]:
+                    try:
+                        title_elem = item.find_element(By.CSS_SELECTOR, '[data-qa-itemtype="docTitle"]')
+                        if title_elem and title_elem.text.strip() and len(title_elem.text.strip()) > 5:
+                            has_real_content = True
+                            break
+                    except:
+                        continue
+                
+                if not has_real_content and len(placeholder_items) > 0:
+                    send_message_to_client(socketio, app, "La page n'a pas fini de charger. Timeout après 30 secondes.", session_id)
+                    print(f"[TIMEOUT] La page n'a pas fini de charger après 30 secondes. Éléments trouvés: {len(placeholder_items)}")
+                else:
+                    send_message_to_client(socketio, app, "Erreur lors du chargement des résultats de recherche.", session_id)
                 result_data_sorted = []
 
 

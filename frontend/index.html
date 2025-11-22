@@ -12,7 +12,7 @@
     <div class="container">
         <header>
             <h1 onclick="location.reload()" style="cursor: pointer;" title="Recharger la page"><i class="fas fa-newspaper"></i> Presse Scraper</h1>
-            <p>API Backend - Interface Utilisateur</p>
+            <p><a href="/extension" class="highlight-link">Nouveau&nbsp;! Extension pour navigateur 😄</a></p>
         </header>
 
         <div class="main-content">
@@ -146,8 +146,9 @@
 
         const API_BASE = window.location.protocol + '//' + window.location.host + '/api/v1';
 
-        // Debug mode - activé automatiquement
-        const DEBUG_MODE = true;
+        // Debug mode - activé uniquement si le paramètre ?debug est présent
+        const urlParams = new URLSearchParams(window.location.search);
+        const DEBUG_MODE = urlParams.has('debug');
         let debugVisible = false;
 
         // Fonction pour obtenir une clé API temporaire
@@ -480,6 +481,19 @@
             document.getElementById('debugSection').style.display = 'block';
             debugVisible = true;
             document.getElementById('toggleDebugBtn').innerHTML = '<i class="fas fa-eye-slash"></i> Cacher Debug';
+        } else {
+            document.getElementById('debugSection').style.display = 'none';
+        }
+
+        // Charger l'historique immédiatement au chargement de la page (API publique)
+        // Ne pas attendre la clé API car l'API /articles est publique
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                loadHistory();
+            });
+        } else {
+            // DOM déjà chargé
+            loadHistory();
         }
 
         // Initialiser la clé API puis l'application
@@ -495,7 +509,7 @@
             scrapeBtn.disabled = false;
             scrapeBtn.innerHTML = '<i class="fas fa-magic"></i> Scraper';
 
-            // Une fois la clé API obtenue, charger l'historique
+            // Recharger l'historique une fois la clé API obtenue (au cas où)
             loadHistory();
         }).catch(error => {
             debugLog('Erreur lors de l\'initialisation', error);
@@ -866,9 +880,9 @@
 
                 document.getElementById('articleContent').innerHTML = cleanHtml;
 
-                // Utiliser le chemin relatif du PDF depuis la BDD
-                const pdfPath = `/static/${article.pdf_path.split('/').pop()}`;
-                debugLog('Chemin PDF', { original: article.pdf_path, final: pdfPath });
+                // Utiliser la route publique pour télécharger le PDF
+                const pdfPath = `/article/${article.id}/pdf`;
+                debugLog('Chemin PDF', { original: article.pdf_path, final: pdfPath, articleId: article.id });
 
                 document.getElementById('pdfLink').href = pdfPath;
                 document.getElementById('pdfLinkTop').href = pdfPath;
@@ -886,6 +900,11 @@
 
         function addToHistory(article) {
             const historyList = document.getElementById('historyList');
+            if (!historyList) {
+                console.error('historyList element not found!');
+                debugLog('Erreur: historyList element not found!');
+                return;
+            }
             const item = document.createElement('div');
             item.className = 'history-item';
 
@@ -905,7 +924,7 @@
             infoDiv.appendChild(dateP);
 
             const downloadLink = document.createElement('a');
-            downloadLink.href = `/static/${article.pdf_path.split('/').pop()}`;
+            downloadLink.href = `/article/${article.id}/pdf`;
             downloadLink.className = 'btn btn-sm';
             downloadLink.download = true;
 
@@ -952,28 +971,50 @@
         // Charger l'historique au démarrage
         async function loadHistory() {
             try {
+                debugLog('Chargement de l\'historique...');
+                // L'API /articles est publique, pas besoin de clé API
+                const headers = {};
+                if (API_KEY) {
+                    headers['X-API-Key'] = API_KEY;
+                }
                 const response = await fetch(`${API_BASE}/articles?limit=20`, {
-                    headers: { 'X-API-Key': API_KEY }
+                    headers: headers
                 });
+                
+                debugLog('Réponse API historique:', { status: response.status, ok: response.ok });
                 
                 if (!response.ok) {
                     console.error('Erreur HTTP:', response.status, response.statusText);
+                    debugLog('Erreur HTTP historique:', response.status, response.statusText);
                     return;
                 }
                 
                 const data = await response.json();
+                debugLog('Données reçues:', { hasArticles: !!data.articles, count: data.articles?.length || 0 });
                 
                 if (!data || !data.articles) {
                     console.error('Erreur: données invalides', data);
+                    debugLog('Erreur: données invalides', data);
+                    return;
+                }
+                
+                if (data.articles.length === 0) {
+                    debugLog('Aucun article trouvé dans l\'historique');
                     return;
                 }
                 
                 // L'API retourne du plus récent au plus ancien
                 // Avec insertBefore, on ajoute en premier donc les plus récents arrivent en bas
                 // Pour avoir le plus récent en haut, il faut inverser
-                data.articles.reverse().forEach(article => addToHistory(article));
+                debugLog(`Ajout de ${data.articles.length} articles à l'historique`);
+                data.articles.reverse().forEach(article => {
+                    debugLog('Ajout article:', article.id, article.title?.substring(0, 50));
+                    addToHistory(article);
+                });
+                debugLog('Historique chargé avec succès');
             } catch (error) {
                 console.error('Erreur chargement historique:', error);
+                debugLog('Erreur chargement historique:', error);
             }
         }
     </script>

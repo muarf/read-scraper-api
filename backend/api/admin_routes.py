@@ -4,11 +4,15 @@ Routes API Admin
 from flask import Blueprint, request, jsonify
 from backend.models.database import Database
 from backend.middleware.auth import AuthMiddleware
-from backend.config.settings import API_PREFIX
+from backend.config.settings import API_PREFIX, STATIC_DIR, LOGS_DIR
 from common.utils import generate_id
 import hashlib
 import logging
 import os
+import json
+import glob
+from pathlib import Path
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +63,30 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
         
         articles = db.list_articles(limit=limit, offset=offset)
         
+        # Ne pas retourner le contenu HTML complet pour réduire la taille de la réponse
+        # Le contenu HTML peut être récupéré via /api/v1/article/{article_id} si nécessaire
+        articles_summary = []
+        for article in articles:
+            article_summary = {
+                'id': article.get('id'),
+                'title': article.get('title'),
+                'url': article.get('url'),
+                'site_source': article.get('site_source'),
+                'created_at': article.get('created_at'),
+                'scraped_at': article.get('scraped_at'),
+                'pdf_path': article.get('pdf_path'),
+                'status': article.get('status'),
+                'tags': article.get('tags'),
+                'metadata': article.get('metadata'),
+                # Ne pas inclure html_content pour réduire la taille
+                'has_content': bool(article.get('html_content')),
+                'content_length': len(article.get('html_content', '')) if article.get('html_content') else 0
+            }
+            articles_summary.append(article_summary)
+        
         return jsonify({
-            'articles': articles,
-            'total': len(articles),
+            'articles': articles_summary,
+            'total': len(articles_summary),
             'limit': limit,
             'offset': offset
         })
@@ -82,6 +107,94 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
             'message': f'Article {article_id} supprimé avec succès'
         })
     
+    def _collect_job_logs(job_id: str, max_entries: int = 200):
+        """Récupérer les lignes de log contenant l'identifiant du job."""
+        logs = []
+        try:
+            log_dir = Path(LOGS_DIR)
+            if not log_dir.exists():
+                return logs
+
+            log_files = sorted(
+                log_dir.glob('app.log*'),
+                key=lambda p: p.stat().st_mtime
+            )
+
+            for log_file in log_files:
+                try:
+                    with log_file.open('r', encoding='utf-8', errors='replace') as fh:
+                        for line in fh:
+                            if f'[{job_id}]' in line:
+                                logs.append(line.strip())
+                except Exception as e:
+                    logger.warning(f"Impossible de lire le fichier de log {log_file}: {e}")
+
+            if len(logs) > max_entries:
+                logs = logs[-max_entries:]
+        except Exception as e:
+            logger.error(f"Erreur collecte logs pour job {job_id}: {e}")
+
+        return logs
+
+    def _collect_job_screenshots(job_id: str):
+        """Lister les screenshots de debug associés à un job."""
+        screenshots = []
+        static_dir = Path(STATIC_DIR)
+
+        if not static_dir.exists():
+            return screenshots
+
+        pattern = static_dir / f"debug_*_{job_id}_*.png"
+        for file_path in glob.glob(str(pattern)):
+            try:
+                filename = os.path.basename(file_path)
+                name_without_ext = filename.replace('debug_', '').replace('.png', '')
+
+                screenshot_type = 'unknown'
+                remaining = name_without_ext
+                type_prefixes = [
+                    'before_search_',
+                    'after_input_',
+                    'search_failed_',
+                    'screenshot_'
+                ]
+                for prefix in type_prefixes:
+                    if remaining.startswith(prefix):
+                        screenshot_type = prefix.rstrip('_')
+                        remaining = remaining.replace(prefix, '', 1)
+                        break
+
+                parts = remaining.rsplit('_', 1)
+                if len(parts) != 2:
+                    logger.warning(f"Format de screenshot inattendu: {filename}")
+                    continue
+
+                job_part, ts_part = parts
+                try:
+                    timestamp = int(ts_part)
+                except ValueError:
+                    logger.warning(f"Timestamp invalide dans {filename}: {ts_part}")
+                    continue
+
+                if job_part != job_id:
+                    continue
+
+                screenshots.append({
+                    'filename': filename,
+                    'url': f'/static/{filename}',
+                    'path': file_path,
+                    'type': screenshot_type,
+                    'job_id': job_id,
+                    'timestamp': timestamp,
+                    'datetime': datetime.fromtimestamp(timestamp).isoformat(),
+                    'size': os.path.getsize(file_path)
+                })
+            except Exception as e:
+                logger.warning(f"Erreur analyse screenshot {file_path}: {e}")
+
+        screenshots.sort(key=lambda x: x['timestamp'], reverse=True)
+        return screenshots
+    
     # Route pour lister les jobs
     @admin_bp.route('/jobs', methods=['GET'])
     @auth.require_api_key
@@ -101,6 +214,39 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
         return jsonify({
             'jobs': jobs,
             'total': len(jobs)
+        })
+
+    # Route pour récupérer les détails d'un job
+    @admin_bp.route('/job/<job_id>', methods=['GET'])
+    @auth.require_api_key
+    @auth.require_admin
+    def get_job_details(job_id):
+        """Obtenir les détails, logs et screenshots d'un job."""
+        job = db.get_job(job_id)
+
+        if not job:
+            return jsonify({
+                'error': 'Job introuvable',
+                'message': f'Le job {job_id} n\'existe pas'
+            }), 404
+
+        job_detail = dict(job)
+        data_field = job_detail.get('data')
+        parsed_data = {}
+        if data_field:
+            try:
+                parsed_data = json.loads(data_field)
+            except json.JSONDecodeError:
+                parsed_data = {'raw': data_field}
+        job_detail['data'] = parsed_data
+
+        logs = _collect_job_logs(job_id)
+        screenshots = _collect_job_screenshots(job_id)
+
+        return jsonify({
+            'job': job_detail,
+            'logs': logs,
+            'screenshots': screenshots
         })
     
     # Route pour créer une clé API
@@ -189,14 +335,19 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
         
         days_articles = data.get('days_articles', 90)
         days_jobs = data.get('days_jobs', 7)
+        days_static = data.get('days_static', 7)
         
-        deleted_count = db.cleanup_old_data(days_articles, days_jobs)
+        cleanup_result = db.cleanup_old_data(days_articles, days_jobs, days_static)
         
         return jsonify({
             'message': 'Nettoyage effectué',
-            'articles_deleted': deleted_count,
+            'articles_deleted': cleanup_result.get('articles_deleted', 0),
+            'jobs_deleted': cleanup_result.get('jobs_deleted', 0),
+            'files_deleted': cleanup_result.get('files_deleted', 0),
+            'logs_deleted': cleanup_result.get('logs_deleted', 0),
             'days_articles': days_articles,
-            'days_jobs': days_jobs
+            'days_jobs': days_jobs,
+            'days_static': days_static
         })
     
     # Route pour relancer un job

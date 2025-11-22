@@ -155,9 +155,21 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
                 'message': f'L\'article {article_id} n\'existe pas'
             }), 404
         
-        pdf_path = Path(article['pdf_path'])
+        pdf_path_str = article['pdf_path']
+        
+        # Si le chemin commence par /static/, le remplacer par le chemin réel du répertoire static
+        if pdf_path_str.startswith('/static/'):
+            filename = pdf_path_str.replace('/static/', '', 1)
+            pdf_path = STATIC_DIR / filename
+        else:
+            pdf_path = Path(pdf_path_str)
+        
+        # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
+        if not pdf_path.is_absolute():
+            pdf_path = STATIC_DIR / pdf_path
         
         if not pdf_path.exists():
+            logger.error(f"PDF introuvable: {pdf_path} (chemin original: {pdf_path_str})")
             return jsonify({
                 'error': 'PDF introuvable',
                 'message': 'Le fichier PDF n\'existe pas sur le serveur'
@@ -204,9 +216,27 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
         articles = db.list_articles(limit=limit, offset=offset, 
                                    search=search, site_source=site_source)
         
+        # Ne pas retourner le contenu HTML complet pour réduire la taille de la réponse
+        # Le contenu HTML peut être récupéré via /api/v1/article/{article_id} si nécessaire
+        articles_summary = []
+        for article in articles:
+            article_summary = {
+                'id': article.get('id'),
+                'title': article.get('title'),
+                'url': article.get('url'),
+                'site_source': article.get('site_source'),
+                'created_at': article.get('created_at'),
+                'scraped_at': article.get('scraped_at'),
+                'pdf_path': article.get('pdf_path'),
+                'status': article.get('status'),
+                # Ne pas inclure html_content, tags, metadata pour réduire la taille
+                'has_content': bool(article.get('html_content'))
+            }
+            articles_summary.append(article_summary)
+        
         return jsonify({
-            'articles': articles,
-            'total': len(articles),
+            'articles': articles_summary,
+            'total': len(articles_summary),
             'limit': limit,
             'offset': offset
         })
@@ -232,6 +262,113 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
             'query': query,
             'total': len(articles)
         })
+    
+    # Route pour annuler un job en cours
+    @api_bp.route('/job/<job_id>/cancel', methods=['POST'])
+    @auth.require_api_key
+    @rate_limiter.rate_limit
+    def cancel_job(job_id):
+        """Annuler un job en attente ou en cours de traitement"""
+        job = db.get_job(job_id)
+        
+        if not job:
+            return jsonify({
+                'error': 'Job introuvable',
+                'message': f'Le job {job_id} n\'existe pas'
+            }), 404
+        
+        current_status = job['status']
+        
+        # On peut annuler seulement les jobs en attente ou en cours de traitement
+        if current_status in ['pending', 'processing']:
+            success = db.update_job_status(job_id, 'cancelled', error='Job annulé par l\'utilisateur')
+            
+            if success:
+                logger.info(f"Job {job_id} annulé avec succès (statut précédent: {current_status})")
+                return jsonify({
+                    'message': f'Job {job_id} annulé avec succès',
+                    'previous_status': current_status,
+                    'new_status': 'cancelled'
+                })
+            else:
+                return jsonify({
+                    'error': 'Erreur annulation',
+                    'message': 'Impossible d\'annuler le job'
+                }), 500
+        
+        return jsonify({
+            'error': 'Impossible d\'annuler',
+            'message': f'Le job {job_id} ne peut pas être annulé (statut actuel: {current_status}). Seuls les jobs en attente ou en cours peuvent être annulés.'
+        }), 400
+
+    # Route pour rejeter un article (supprimer l'article associé au job)
+    @api_bp.route('/job/<job_id>/reject', methods=['POST'])
+    @auth.require_api_key
+    @rate_limiter.rate_limit
+    def reject_job(job_id):
+        """Rejeter et supprimer un article associé à un job"""
+        job = db.get_job(job_id)
+        
+        if not job:
+            return jsonify({
+                'error': 'Job introuvable',
+                'message': f'Le job {job_id} n\'existe pas'
+            }), 404
+        
+        article_id = job.get('article_id')
+        
+        if not article_id:
+            return jsonify({
+                'error': 'Aucun article associé',
+                'message': f'Le job {job_id} n\'a pas d\'article associé à rejeter'
+            }), 400
+        
+        # Récupérer l'article pour obtenir le chemin du PDF
+        article = db.get_article(article_id)
+        
+        if not article:
+            return jsonify({
+                'error': 'Article introuvable',
+                'message': f'L\'article {article_id} associé au job n\'existe pas'
+            }), 404
+        
+        # Supprimer le fichier PDF si il existe
+        pdf_path_str = article.get('pdf_path')
+        if pdf_path_str:
+            try:
+                # Si le chemin commence par /static/, le remplacer par le chemin réel
+                if pdf_path_str.startswith('/static/'):
+                    filename = pdf_path_str.replace('/static/', '', 1)
+                    pdf_path = STATIC_DIR / filename
+                else:
+                    pdf_path = Path(pdf_path_str)
+                
+                # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
+                if not pdf_path.is_absolute():
+                    pdf_path = STATIC_DIR / pdf_path
+                
+                if pdf_path.exists():
+                    pdf_path.unlink()
+                    logger.info(f"Fichier PDF supprimé: {pdf_path}")
+            except Exception as e:
+                logger.warning(f"Impossible de supprimer le PDF {pdf_path_str}: {e}")
+                # On continue quand même la suppression de l'article
+        
+        # Supprimer l'article de la base de données
+        success = db.delete_article(article_id)
+        
+        if success:
+            logger.info(f"Article {article_id} rejeté et supprimé (job: {job_id})")
+            return jsonify({
+                'message': f'Article {article_id} rejeté et supprimé avec succès',
+                'job_id': job_id,
+                'article_id': article_id
+            })
+        else:
+            return jsonify({
+                'error': 'Erreur suppression',
+                'message': 'Impossible de supprimer l\'article'
+            }), 500
 
     # Route pour lister les screenshots de debug
     @api_bp.route('/debug/screenshots', methods=['GET'])
@@ -298,10 +435,17 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
             # Trier par date décroissante (plus récent en premier)
             screenshots.sort(key=lambda x: x['timestamp'], reverse=True)
+            
+            # Limiter le nombre de screenshots retournés pour éviter les problèmes de taille
+            # Par défaut, retourner seulement les 50 plus récents
+            limit = request.args.get('limit', 50, type=int)
+            screenshots_limited = screenshots[:limit]
 
             return jsonify({
-                'screenshots': screenshots,
-                'total': len(screenshots)
+                'screenshots': screenshots_limited,
+                'total': len(screenshots),
+                'returned': len(screenshots_limited),
+                'limit': limit
             })
 
         except Exception as e:
