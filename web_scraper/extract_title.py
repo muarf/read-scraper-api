@@ -6,17 +6,106 @@ import string
 from collections import Counter
 import re
 from datetime import datetime
+import time
 from common.utils import send_message_to_client
+
+def _try_google_fallback(url, browser):
+    """Fallback : chercher l'URL sur Google pour récupérer le titre depuis les résultats"""
+    try:
+        # Nettoyer l'URL pour la recherche (enlever les paramètres de test ou de tracking)
+        import urllib.parse
+        parsed = urllib.parse.urlparse(url)
+        clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        
+        print(f"Tentative de fallback Google pour l'URL : {clean_url}")
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(clean_url)}"
+        browser.get(search_url)
+        
+        # Attendre un peu pour le chargement
+        time.sleep(4)
+        
+        # Gérer le bouton de consentement Google si présent
+        try:
+            # Sélecteurs variés pour le bouton d'acceptation
+            consent_ids = ["L2AGLb", "introAgreeButton", "ack-button"]
+            for cid in consent_ids:
+                try:
+                    btn = browser.find_element("id", cid)
+                    if btn.is_displayed():
+                        btn.click()
+                        time.sleep(2)
+                        break
+                except: continue
+                
+            # Fallback par texte si les IDs échouent
+            consent_texts = ["Tout accepter", "I agree", "Accepter tout", "Agree", "Tout approuver"]
+            buttons = browser.find_elements("tag name", "button")
+            for btn in buttons:
+                if any(text in btn.text for text in consent_texts):
+                    try:
+                        btn.click()
+                        time.sleep(2)
+                        break
+                    except: continue
+        except Exception as e:
+            print(f"Erreur lors de la gestion du consentement : {e}")
+
+        # Chercher dans les résultats Google
+        print(f"DEBUG Google Title: {browser.title}")
+        if "Google" in browser.title and "Consent" in browser.title:
+            print("AVERTISSEMENT: Toujours sur la page de consentement Google !")
+            
+        # 1. Résultats organiques standards (h3)
+        results = browser.find_elements("tag name", "h3")
+        print(f"DEBUG: Nombre de h3 trouvés: {len(results)}")
+        for res in results:
+            title_candidate = res.text.strip()
+            print(f"DEBUG candidate h3: '{title_candidate}'")
+            # On cherche un titre assez long et qui ne soit pas une catégorie Google
+            if title_candidate and len(title_candidate) > 15:
+                # Éviter les sections de service
+                blacklist = ["vidéo", "recherches associées", "images", "actualités", "maps"]
+                if not any(b in title_candidate.lower() for b in blacklist):
+                    print(f"Titre récupéré via Google (h3) : {title_candidate}")
+                    return title_candidate
+        
+        # 2. Section "À la une" (Top Stories)
+        try:
+            top_stories = browser.find_elements("css selector", "div[role='heading']")
+            for story in top_stories:
+                title_candidate = story.text.strip()
+                if title_candidate and len(title_candidate) > 15:
+                    print(f"Titre récupéré via Google (Top Stories) : {title_candidate}")
+                    return title_candidate
+        except: pass
+
+        # 3. Fallback ultime : premier lien qui contient l'URL cible
+        try:
+            links = browser.find_elements("css selector", "div.g a")
+            for link in links:
+                href = link.get_attribute("href")
+                if href and clean_url in href:
+                    h3 = link.find_element("tag name", "h3")
+                    if h3.text:
+                        print(f"Titre récupéré via Google (link h3) : {h3.text}")
+                        return h3.text.strip()
+        except: pass
+
+        print("Aucun titre trouvé sur Google Search")
+        return None
+    except Exception as e:
+        print(f"Erreur lors du fallback Google : {e}")
+        return None
 
 def extract_title(url, browser=None, max_words=15):
     try:
         print(f"url : {url}")
 
         # Mesurer le temps de la requête
-        import time
         start = time.time()
 
         title = None
+        is_blocked = False
 
         # Si un browser est fourni, l'utiliser pour contourner les blocages
         if browser is not None:
@@ -31,53 +120,86 @@ def extract_title(url, browser=None, max_words=15):
                     time.sleep(wait_interval)
                     elapsed += wait_interval
                     current_title = browser.title
+                    current_url = browser.current_url
+
+                    if "test-google-fallback" in url:
+                        print("FORCAGE DU BLOCAGE pour test google fallback")
+                        is_blocked = True
+                        break
+                    time.sleep(wait_interval)
+                    elapsed += wait_interval
+                    current_title = browser.title
+                    current_url = browser.current_url
 
                     # Si le titre est valide (pas vide, pas de pages de protection)
                     invalid_titles = ["Un instant…", "Just a moment", "Loading...", "Just a moment...",
                                     "Please wait...", "Checking your browser...", "Verifying...",
-                                    "Cloudflare", "DDoS protection", "Security Check"]
+                                    "Cloudflare", "DDoS protection", "Security Check", "Access Denied"]
+                    
+                    # Pattern spécifique pour Libération quand on est bloqué
+                    if "liberation.fr" in current_url.lower() and "bloqué" in current_title.lower():
+                        print(f"Blocage Libération détecté par le titre : {current_title}")
+                        is_blocked = True
+                        break
 
                     if current_title and not any(invalid in current_title for invalid in invalid_titles):
                         title = current_title
                         print(f"Titre obtenu via browser en {time.time() - start:.2f} secondes")
                         break
 
-                # Si le titre n'est toujours pas valide après l'attente, passer à requests
-                if not title:
-                    print(f"Titre invalide obtenu après {max_wait}s : {browser.title}, passage à requests")
-                    browser = None
-
+                # Si le titre n'est toujours pas valide après l'attente, vérifier le body
+                if not title and not is_blocked:
+                    page_source = browser.page_source.lower()
+                    bot_signals = ["cloudflare", "sucuri", "ddos protection", "captcha", "security check", "hcaptcha"]
+                    if any(signal in page_source for signal in bot_signals):
+                        print("Blocage bot détecté dans la source de la page")
+                        is_blocked = True
+                    
+                    if not is_blocked:
+                        print(f"Titre invalide obtenu après {max_wait}s : {browser.title}, passage à requests")
+                        # Ne pas mettre browser à None ici car on pourrait en avoir besoin pour le fallback Google
+                
             except Exception as e:
-                print(f"Erreur avec browser, retour à requests : {e}")
-                browser = None
+                print(f"Erreur avec browser : {e}")
+
+        # Si bloqué par un bot, tenter le fallback Google Search si on a un browser
+        if is_blocked and browser:
+            print("Tentative de contournement via Google Search...")
+            title = _try_google_fallback(url, browser)
         
-        # Si pas de browser ou si le browser a échoué, utiliser requests
-        if browser is None or not title:
+        # Si pas encore de titre, tenter requests
+        if not title:
+            # On tente requests seulement si on n'a pas déjà détecté un blocage certain par browser
+            # ou si on n'a pas de browser du tout
             headers = {
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             }
-            response = requests.get(url, headers=headers, timeout=15)
-            response.raise_for_status()
-
-            print(f"Réponse obtenue via requests en {time.time() - start:.2f} secondes")
-
-            # Parser uniquement le tag <title>
-            soup = BeautifulSoup(response.text, 'html.parser', parse_only=SoupStrainer(["title", "meta"]))
-            title_element = soup.find('title')
-
-            if title_element:
-                title = title_element.text.strip()
-            else:
-                return None
-
-            # Récupérer le nom du site si disponible (og:site_name) pour l'exclure ensuite
-            site_name = None
             try:
-                meta_site = soup.find('meta', attrs={'property': 'og:site_name'})
-                if meta_site and meta_site.get('content'):
-                    site_name = meta_site.get('content').strip()
-            except Exception:
-                site_name = None
+                # Si on a déjà détecté un blocage browser, requests a peu de chances de réussir
+                # mais on tente quand même au cas où (sauf si on est certain d'être bloqué)
+                print("Tentative via requests...")
+                response = requests.get(url, headers=headers, timeout=15)
+                response.raise_for_status()
+
+                # Parser uniquement le tag <title>
+                soup = BeautifulSoup(response.text, 'html.parser', parse_only=SoupStrainer(["title", "meta"]))
+                title_element = soup.find('title')
+
+                if title_element:
+                    title = title_element.text.strip()
+            except Exception as e:
+                print(f"Erreur requests : {e}")
+
+            # Récupérer le nom du site si disponible
+            site_name = None
+            if title:
+                try:
+                    soup = BeautifulSoup(response.text, 'html.parser') if 'soup' not in locals() else soup
+                    meta_site = soup.find('meta', attrs={'property': 'og:site_name'})
+                    if meta_site and meta_site.get('content'):
+                        site_name = meta_site.get('content').strip()
+                except Exception:
+                    site_name = None
 
         if not title:
             print("Aucun titre valide trouvé après toutes les tentatives")
@@ -86,18 +208,59 @@ def extract_title(url, browser=None, max_words=15):
         # Vérifier que le titre extrait semble légitime (pas trop court, pas de protection)
         if len(title.strip()) < 5:
             print(f"Titre trop court : '{title}', considéré comme invalide")
-            return None
+            # Tenter Google Fallback ici aussi car un titre trop court est souvent un signe de blocage/redirection
+            if browser:
+                print("Titre trop court, tentative de fallback Google...")
+                title = _try_google_fallback(url, browser)
+                if not title: return None
+            else:
+                return None
+
+        # Vérifier si le titre est juste le nom du domaine
+        from urllib.parse import urlparse
+        import re
+        parsed_url = urlparse(url)
+        domain_parts = parsed_url.netloc.split('.')
+        main_domain = domain_parts[-2] if len(domain_parts) >= 2 else domain_parts[0]
+        
+        title_clean = title.lower().strip()
+        import unicodedata
+        def strip_accents(s):
+            return ''.join(c for c in unicodedata.normalize('NFD', s)
+                          if unicodedata.category(c) != 'Mn')
+        
+        title_no_accents = strip_accents(title_clean)
+        domain_no_accents = strip_accents(main_domain.lower())
+        full_domain_no_accents = strip_accents(parsed_url.netloc.lower().replace('www.', ''))
+
+        if (title_no_accents == domain_no_accents or 
+            title_no_accents == full_domain_no_accents or
+            title_no_accents == "accueil" or
+            title_no_accents == "home"):
+            print(f"Titre générique ou nom de domaine détecté : '{title}', probable blocage")
+            # Une dernière chance via Google si on a un browser
+            if browser:
+                print("Titre générique détecté, tentative de fallback Google...")
+                title = _try_google_fallback(url, browser)
+                if not title: return None
+            else:
+                return None
 
         # Vérifier les patterns de protection Cloudflare courants
         cloudflare_patterns = [
             r'just a moment', r'checking your browser', r'please wait',
-            r'verifying', r'security check', r'cloudflare'
+            r'verifying', r'security check', r'cloudflare', r'access denied'
         ]
 
         title_lower = title.lower()
         if any(pattern in title_lower for pattern in cloudflare_patterns):
-            print(f"Titre indique une protection Cloudflare : '{title}'")
-            return None
+            print(f"Titre indique une protection Cloudflare ou blocage : '{title}'")
+            if browser:
+                print("Blocage détecté via patterns, tentative de fallback Google...")
+                title = _try_google_fallback(url, browser)
+                if not title: return None
+            else:
+                return None
 
         # Traitement du titre pour créer la requête
         # 1) retirer les suffixes de type " - Le Parisien", " | Le Monde", etc.

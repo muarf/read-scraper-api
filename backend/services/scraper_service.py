@@ -19,7 +19,7 @@ from web_scraper.chrome_driver_login import login_to_target_site
 from web_scraper.chrome_driver_search import search_target_site
 from web_scraper.extract_title import extract_title
 from web_scraper.download_article import download_article, sanitize_filename
-from common.utils import generate_id, file_exists, NoResultException
+from common.utils import generate_id, file_exists, NoResultException, KeywordsNeededException
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import os
@@ -50,12 +50,18 @@ class ScraperService:
             logger.warning(f"Erreur lors du nettoyage des fichiers de debug pour le job {job_id}: {e}")
 
     def _ensure_browser(self):
-        """S'assurer que le navigateur est initialisé"""
+        """S'assurer que le navigateur est initialisé (sans forcément se connecter)"""
         if not self._browser_initialized:
             logger.info("Initialisation lazy du navigateur")
             self._init_browser()
-            self._login()
             self._browser_initialized = True
+
+    def _ensure_login(self):
+        """S'assurer qu'on est connecté à Tagaday"""
+        if not hasattr(self, '_logged_in') or not self._logged_in:
+            logger.info("Connexion à Tagaday...")
+            self._login()
+            self._logged_in = True
 
     def remove_highlight_tags(self, html: str) -> str:
         """Supprime les balises mark/highlight du HTML tout en gardant le contenu"""
@@ -116,59 +122,33 @@ class ScraperService:
         chrome_options.binary_location = current_chrome_path
         logger.info(f"[BROWSER_INIT] Chrome path: {current_chrome_path}")
         
-        # Utiliser le chromedriver local
-        chromedriver_path = settings_module.CHROMEDRIVER_PATH
-        logger.info(f"Tentative d'utilisation du chromedriver: {chromedriver_path}")
-        if os.path.exists(chromedriver_path) and os.path.isfile(chromedriver_path):
+        if HEADLESS:
+            chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--window-size=1920x1080')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-web-security')
+        chrome_options.add_argument('--disable-features=VizDisplayCompositor')
+        chrome_options.add_argument('--disable-background-timer-throttling')
+        chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+        chrome_options.add_argument('--disable-renderer-backgrounding')
+        chrome_options.add_argument('--remote-debugging-port=0')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--disable-software-rasterizer')
+        
+        try:
+            # Utiliser chromedriver-autoinstaller pour installer et gérer automatiquement le bon chromedriver
+            import chromedriver_autoinstaller
+            driver_path = chromedriver_autoinstaller.install()
+            
             from selenium.webdriver.chrome.service import Service
-            logger.info(f"Chromedriver trouvé: {chromedriver_path}")
-            service = Service(chromedriver_path)
+            service = Service(driver_path) if driver_path else Service()
             
-            # Mode headless activé pour éviter les problèmes d'affichage en environnement serveur
-            if HEADLESS:
-                chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--window-size=1920x1080')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-web-security')
-            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-            chrome_options.add_argument('--disable-background-timer-throttling')
-            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-            chrome_options.add_argument('--disable-renderer-backgrounding')
-            chrome_options.add_argument('--remote-debugging-port=0')
-            chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--disable-software-rasterizer')
-            
-            try:
-                self.browser = webdriver.Chrome(service=service, options=chrome_options)
-                logger.info("Navigateur Chrome initialisé avec chromedriver_local (headless={})".format(HEADLESS))
-            except Exception as e:
-                logger.error(f"Erreur initialisation Chrome avec chromedriver_local: {e}")
-                raise
-        else:
-            # Fallback si chromedriver_local n'existe pas
-            # Mode headless activé pour éviter les problèmes d'affichage en environnement serveur
-            if HEADLESS:
-                chrome_options.add_argument('--headless')
-            chrome_options.add_argument('--window-size=1920x1080')
-            chrome_options.add_argument('--no-sandbox')
-            chrome_options.add_argument('--disable-dev-shm-usage')
-            chrome_options.add_argument('--disable-web-security')
-            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
-            chrome_options.add_argument('--disable-background-timer-throttling')
-            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-            chrome_options.add_argument('--disable-renderer-backgrounding')
-            chrome_options.add_argument('--remote-debugging-port=0')
-            chrome_options.add_argument('--disable-gpu')
-            chrome_options.add_argument('--disable-software-rasterizer')
-            
-            try:
-                self.browser = webdriver.Chrome(options=chrome_options)
-                logger.info("[BROWSER_INIT] Navigateur Chrome initialisé avec succès")
-                logger.info(f"[BROWSER_INIT] Navigateur object: {self.browser}")
-            except Exception as e:
-                logger.error(f"[BROWSER_INIT] Erreur initialisation Chrome: {e}")
-                raise
+            self.browser = webdriver.Chrome(service=service, options=chrome_options)
+            logger.info(f"Navigateur Chrome initialisé avec succès (headless={HEADLESS}) via autoinstaller")
+        except Exception as e:
+            logger.error(f"Erreur initialisation Chrome avec autoinstaller: {e}")
+            raise
     
     def _login(self):
         """Se connecter au site cible"""
@@ -181,69 +161,6 @@ class ScraperService:
         except Exception as e:
             logger.warning(f"[LOGIN] Erreur connexion, on continue: {e}")
 
-    def _try_direct_scraping(self, browser, url, parsed_url, job_id):
-        """Tenter un scraping direct depuis l'URL pour les sites supportés"""
-        try:
-            logger.info(f"[{job_id}] Tentative de scraping direct: {url}")
-
-            # Utiliser le navigateur existant ou en créer un nouveau
-            if browser is None:
-                browser = self._get_browser()
-                if not browser:
-                    return None
-
-            # Accéder directement à l'URL
-            browser.get(url)
-
-            # Attendre que la page se charge
-            time.sleep(3)
-
-            # Chercher le contenu principal (différent selon le site)
-            domain = urlp.urlparse(url).netloc
-
-            content_selectors = {
-                'leparisien.fr': 'div.content',
-                'lemonde.fr': 'article',
-                'liberation.fr': '.article-body',
-                'mediapart.fr': '.content'
-            }
-
-            selector = content_selectors.get(domain, 'div.content')
-
-            try:
-                from selenium.webdriver.common.by import By
-                from selenium.webdriver.support.ui import WebDriverWait
-                from selenium.webdriver.support import expected_conditions as EC
-
-                content_element = WebDriverWait(browser, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                )
-
-                html_content = content_element.get_attribute('outerHTML')
-
-                # Générer un ID d'article et sauvegarder
-                article_id = generate_id(10)
-                title = browser.title or f"Article {article_id}"
-
-                # Sauvegarder dans la base de données
-                self.db.save_article(article_id, title, html_content, url, job_id)
-
-                logger.info(f"[{job_id}] Article scrapé directement: {article_id}")
-
-                return (article_id, {
-                    'id': article_id,
-                    'url': url,
-                    'title': title,
-                    'html_content': html_content
-                })
-
-            except Exception as e:
-                logger.warning(f"[{job_id}] Échec extraction contenu avec selector {selector}: {e}")
-                return None
-
-        except Exception as e:
-            logger.warning(f"[{job_id}] Échec scraping direct: {e}")
-            return None
 
     def _get_browser(self):
         """Récupérer ou initialiser le navigateur"""
@@ -252,8 +169,6 @@ class ScraperService:
             logger.info("[BROWSER] Aucun navigateur, initialisation...")
             self._init_browser()
             logger.info(f"[BROWSER] Navigateur initialisé: {self.browser is not None}")
-            self._login()
-            logger.info("[BROWSER] Connexion effectuée")
         else:
             logger.info("[BROWSER] Navigateur existant réutilisé")
         return self.browser
@@ -296,6 +211,9 @@ class ScraperService:
                 if custom_search_terms:
                     self.db.update_job_data(job_id, {'custom_search_terms': custom_search_terms})
             
+            # Utiliser le navigateur déjà initialisé
+            browser = self.browser
+
             # Utiliser les termes personnalisés si fournis OU si c'est un job search_terms uniquement
             if custom_search_terms:
                 logger.info(f"[{job_id}] === Utilisation de termes de recherche personnalisés ===")
@@ -312,7 +230,7 @@ class ScraperService:
                 title = custom_search_terms  # Le titre d'affichage reste tel quel
                 logger.info(f"[{job_id}] Termes personnalisés nettoyés: '{query}'")
             else:
-                # Étape 1: Extraire le titre (essaie sans navigateur d'abord)
+                # Étape 1: Extraire le titre (utilise le navigateur initialisé mais pas encore connecté)
                 logger.info(f"[{job_id}] === ÉTAPE 1: Extraction du titre ===")
                 
                 # Mettre à jour l'étape actuelle
@@ -321,28 +239,15 @@ class ScraperService:
                     'step_description': 'Analyse de l\'URL et extraction du titre...'
                 })
                 
-                result = extract_title(url)  # Essaie sans navigateur d'abord
-                logger.info(f"[{job_id}] Résultat extract_title sans navigateur: {result}")
+                # Utiliser le navigateur déjà initialisé pour extraire le titre du site source
+                browser = self.browser
+                result = extract_title(url, browser)
+                logger.info(f"[{job_id}] Résultat extract_title avec navigateur (avant login): {result}")
 
-                # Si échec, essayer avec un navigateur
-                if result is None:
-                    logger.info(f"[{job_id}] Échec sans navigateur, création pour titre")
-                    browser = self._get_browser()
-                    result = extract_title(url, browser)
-                    logger.info(f"[{job_id}] Résultat extract_title avec navigateur: {result}")
-
-                if result is None:
-                    logger.error(f"[{job_id}] Impossible d'extraire le titre de l'URL {url} - site protégé par Cloudflare ou indisponible")
-                    # Essayer une approche alternative : utiliser l'URL elle-même comme titre
-                    parsed_url = urlp.urlparse(url)
-                    fallback_title = parsed_url.path.strip('/').replace('-', ' ').replace('_', ' ').replace('/', ' ').title()
-                    # Nettoyer les espaces multiples
-                    fallback_title = ' '.join(fallback_title.split())
-                    if fallback_title and len(fallback_title) > 5:
-                        result = (fallback_title, fallback_title)
-                        logger.info(f"[{job_id}] Utilisation du titre de fallback depuis l'URL: {result}")
-                    else:
-                        raise Exception(f"Impossible d'extraire le titre de l'URL {url} - protection anti-bot détectée")
+                if result is None or not result[0]:
+                    error_msg = f"Impossible d'extraire des mots-clés de l'URL {url}. Vous semblez être bloqué par le site (ex: Libération) ou la page ne contient pas assez d'information. Veuillez essayer en fournissant directement des mots-clés de recherche."
+                    logger.error(f"[{job_id}] {error_msg}")
+                    raise KeywordsNeededException(error_msg)
 
                 query, title = result
                 logger.info(f"[{job_id}] Titre extrait: '{title}'")
@@ -405,46 +310,17 @@ class ScraperService:
                         'pdf_path': str(pdf_path)
                     })
 
-            # Étape 3: Recherche sur le site cible ou scraping direct
-            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche/scraping ===")
+            # Étape 3: Recherche sur Tagaday
+            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche Tagaday ===")
 
-            # Vérifier si l'URL vient d'un site supporté pour scraping direct
-            parsed_url = urlp.urlparse(url)
-            supported_domains = ['leparisien.fr', 'lemonde.fr', 'liberation.fr', 'mediapart.fr']
+            # S'assurer d'être connecté à Tagaday AVANT la recherche
+            # ensure_login navigue vers Tagaday si on n'y est pas déjà
+            self._ensure_login()
 
-            # Vérifier si le domaine contient un des domaines supportés
-            is_supported_domain = any(domain in parsed_url.netloc for domain in supported_domains)
-            logger.info(f"[{job_id}] Domaine détecté: {parsed_url.netloc}, supporté: {is_supported_domain}")
-
-            if is_supported_domain:
-                logger.info(f"[{job_id}] URL de site supporté détecté ({parsed_url.netloc}), tentative de scraping direct")
-                # Essayer le scraping direct
-                try:
-                    direct_result = self._try_direct_scraping(browser, url, parsed_url, job_id)
-                    if direct_result:
-                        logger.info(f"[{job_id}] Scraping direct réussi")
-                        # Mettre à jour les données de debug pour scraping direct
-                        self.db.update_job_data(job_id, {
-                            'scraping_method': 'direct',
-                            'source_site': parsed_url.netloc
-                        })
-                        return direct_result
-                    else:
-                        logger.info(f"[{job_id}] Scraping direct échoué, fallback vers recherche Tagadoc")
-                except Exception as e:
-                    logger.warning(f"[{job_id}] Erreur scraping direct: {e}, fallback vers recherche")
-
-            # Recherche Tagadoc comme fallback
-            # Utiliser le navigateur existant si déjà ouvert pour le titre, sinon en créer un nouveau
-            if browser is None:
-                browser = self._get_browser()  # Connexion seulement maintenant pour la recherche
-                logger.info(f"[{job_id}] Navigateur initialisé pour recherche: {browser is not None}")
-            else:
-                logger.info(f"[{job_id}] Réutilisation navigateur existant: {browser is not None}")
             # Screenshot avant la recherche
             try:
-                debug_screenshot_path = f"/root/read-scraper-api/static/debug_before_search_{job_id}_{int(time.time())}.png"
-                browser.save_screenshot(debug_screenshot_path)
+                debug_screenshot_path = STATIC_DIR / f"debug_before_search_{job_id}_{int(time.time())}.png"
+                self.browser.save_screenshot(str(debug_screenshot_path))
                 logger.info(f"[{job_id}] Screenshot avant recherche: {debug_screenshot_path}")
 
                 # Mettre à jour les données du job avec l'étape actuelle
@@ -483,8 +359,8 @@ class ScraperService:
             if search_result is None:
                 # Screenshot en cas d'échec de recherche
                 try:
-                    error_screenshot_path = f"/root/read-scraper-api/static/debug_search_failed_{job_id}_{int(time.time())}.png"
-                    browser.save_screenshot(error_screenshot_path)
+                    error_screenshot_path = STATIC_DIR / f"debug_search_failed_{job_id}_{int(time.time())}.png"
+                    browser.save_screenshot(str(error_screenshot_path))
                     logger.info(f"[{job_id}] Screenshot d'échec de recherche: {error_screenshot_path}")
                 except Exception as ss_error:
                     logger.warning(f"[{job_id}] Impossible de prendre screenshot d'échec: {ss_error}")
@@ -620,8 +496,8 @@ class ScraperService:
             # Prendre un screenshot en cas d'erreur pour le debug
             try:
                 if self.browser:
-                    screenshot_path = f"/root/read-scraper-api/static/debug_screenshot_{job_id}_{int(time.time())}.png"
-                    self.browser.save_screenshot(screenshot_path)
+                    screenshot_path = STATIC_DIR / f"debug_screenshot_{job_id}_{int(time.time())}.png"
+                    self.browser.save_screenshot(str(screenshot_path))
                     logger.info(f"[{job_id}] Screenshot d'erreur sauvegardé: {screenshot_path}")
             except Exception as screenshot_error:
                 logger.warning(f"[{job_id}] Impossible de prendre le screenshot d'erreur: {screenshot_error}")

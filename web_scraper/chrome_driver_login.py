@@ -14,24 +14,32 @@ def login_to_target_site(socketio, app, driver, username, password, session_id):
         driver.get("https://read.tagaday.fr")
         #for cookie in example_cookies:
             #driver.add_cookie(cookie)
-        # Remplir le formulaire de connexion
-        send_message_to_client(socketio, app,"Attente du champ password...", session_id)
-        keyword_field = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//input[@id='password']"))
+        # Étape 1 : remplir et soumettre l'identifiant
+        send_message_to_client(socketio, app,"Attente du champ username...", session_id)
+        username_field = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "username"))
         )
-        send_message_to_client(socketio, app,"Champ password trouvé, recherche username...", session_id)
-        username_field = driver.find_element("id", "username")
-        send_message_to_client(socketio, app,"Champ username trouvé, récupération password...", session_id)
-        password_field = driver.find_element("id", "password")
-        send_message_to_client(socketio, app,"Tous les champs trouvés", session_id)
+        send_message_to_client(socketio, app,"Champ username trouvé", session_id)
 
-        send_message_to_client(socketio, app,f"Remplissage du nom d'utilisateur", session_id)
+        send_message_to_client(socketio, app,f"Remplissage du nom d'utilisateur...", session_id)
+        username_field.clear()
         username_field.send_keys(username)
 
+        send_message_to_client(socketio, app,"Soumission du username...", session_id)
+        username_field.send_keys(Keys.RETURN)
+
+        # Étape 2 : attendre que le champ password apparaisse après la redirection SSO
+        send_message_to_client(socketio, app,"Attente du champ password...", session_id)
+        password_field = WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((By.ID, "password"))
+        )
+        send_message_to_client(socketio, app,"Champ password trouvé", session_id)
+
         send_message_to_client(socketio, app,"Remplissage du mot de passe...", session_id)
+        password_field.clear()
         password_field.send_keys(password)
 
-        # Soumettre le formulaire
+        # Soumettre le formulaire complet
         send_message_to_client(socketio, app,"Soumission du formulaire de connexion...", session_id)
         password_field.send_keys(Keys.RETURN)
 
