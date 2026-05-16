@@ -49,6 +49,37 @@ class ScraperService:
         except Exception as e:
             logger.warning(f"Erreur lors du nettoyage des fichiers de debug pour le job {job_id}: {e}")
 
+    def _inject_cookies(self, cookies: list):
+        """
+        Injecter des cookies utilisateur dans la session Selenium.
+        Les cookies doivent être une liste d'objets {name, value, domain, path, ...}
+        """
+        if not cookies or not self.browser:
+            return
+
+        logger.info(f"Injection de {len(cookies)} cookies utilisateur")
+        for cookie in cookies:
+            try:
+                cookie_dict = {
+                    'name': cookie.get('name', ''),
+                    'value': cookie.get('value', ''),
+                }
+                if 'domain' in cookie:
+                    cookie_dict['domain'] = cookie['domain']
+                if 'path' in cookie:
+                    cookie_dict['path'] = cookie['path']
+                if 'secure' in cookie:
+                    cookie_dict['secure'] = cookie['secure']
+                if 'httpOnly' in cookie:
+                    cookie_dict['httpOnly'] = cookie['httpOnly']
+
+                self.browser.add_cookie(cookie_dict)
+                logger.debug(f"Cookie injecté: {cookie_dict['name']} (domain: {cookie_dict.get('domain', 'N/A')})")
+            except Exception as e:
+                logger.warning(f"Erreur injection cookie {cookie.get('name', '?')}: {e}")
+
+        logger.info("Cookies injectés avec succès")
+
     def _ensure_browser(self):
         """S'assurer que le navigateur est initialisé (sans forcément se connecter)"""
         if not self._browser_initialized:
@@ -187,6 +218,26 @@ class ScraperService:
         # S'assurer que le navigateur est initialisé
         self._ensure_browser()
 
+        # Injecter les cookies utilisateur si fournis (avant toute navigation)
+        job = self.db.get_job(job_id)
+        if job and job.get('status') == 'completed':
+            self._cleanup_job_screenshots(job_id)
+        job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
+        user_cookies = job_data.get('user_cookies', [])
+        if user_cookies:
+            # Naviguer d'abord sur le domaine de base pour pouvoir injecter les cookies
+            # (Selenium requiert d'être sur le domaine avant d'ajouter un cookie)
+            try:
+                # Extraire le domaine de l'URL cible pour la navigation initiale
+                parsed_target = urlp.urlparse(url if not url.startswith('search_terms:') else 'https://www.liberation.fr')
+                base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
+                self.browser.get(base_url)
+                logger.info(f"[{job_id}] Navigation initiale sur {base_url} pour injection cookies")
+                time.sleep(2)
+            except Exception as e:
+                logger.warning(f"[{job_id}] Erreur navigation initiale pour cookies: {e}")
+            self._inject_cookies(user_cookies)
+
         try:
             logger.info(f"[{job_id}] === DÉBUT DU SCRAPING ===")
             logger.info(f"[{job_id}] URL: {url}")
@@ -194,10 +245,6 @@ class ScraperService:
             browser = None  # Navigateur potentiel pour l'extraction du titre
 
             # Vérifier si des termes de recherche personnalisés ont été fournis
-            job = self.db.get_job(job_id)
-            if job and job.get('status') == 'completed':
-                self._cleanup_job_screenshots(job_id)
-            job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
             custom_search_terms = job_data.get('custom_search_terms')
             
             # Détecter si c'est un job avec seulement des search_terms (URL placeholder)

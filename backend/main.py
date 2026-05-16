@@ -152,6 +152,22 @@ def index():
     frontend_path = Path(__file__).parent.parent / 'frontend' / 'index.html'
     return send_file(str(frontend_path))
 
+# Route mobile - App mobile hybride
+@app.route('/mobile')
+@app.route('/mobile/')
+def mobile_app():
+    """App mobile hybride"""
+    from pathlib import Path
+    mobile_path = Path(__file__).parent.parent / 'mobile' / 'index.html'
+    return send_file(str(mobile_path))
+
+@app.route('/mobile/<path:filename>')
+def mobile_files(filename):
+    """Servir les fichiers de l'app mobile"""
+    from pathlib import Path
+    mobile_dir = Path(__file__).parent.parent / 'mobile'
+    return send_from_directory(str(mobile_dir), filename)
+
 @app.route('/read/')
 @app.route('/read')
 def read():

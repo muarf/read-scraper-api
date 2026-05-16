@@ -36,12 +36,20 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
         # Accepter soit une URL, soit des search_terms
         url = data.get('url', '').strip() if data else ''
         search_terms = data.get('search_terms', '').strip() if data else ''
+        cookies = data.get('cookies', []) if data else []
         
         # Vérifier qu'au moins l'un des deux est fourni
         if not url and not search_terms:
             return jsonify({
                 'error': 'Paramètres manquants',
                 'message': 'Vous devez fournir soit une URL, soit des termes de recherche'
+            }), 400
+        
+        # Valider le format des cookies
+        if cookies and not isinstance(cookies, list):
+            return jsonify({
+                'error': 'Format cookies invalide',
+                'message': 'Le champ cookies doit être une liste d\'objets {name, value, domain, ...}'
             }), 400
         
         # Si on a une URL, vérifier le cache
@@ -67,10 +75,14 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
                 'message': 'Impossible de créer le job de scraping'
             }), 500
         
-        # Stocker les termes de recherche personnalisés si fournis (priorité aux search_terms fournis)
+        # Stocker les cookies et search_terms dans les données du job
+        job_data = {}
         if search_terms:
-            db.update_job_data(job_id, {'custom_search_terms': search_terms})
-            logger.info(f"Termes de recherche personnalisés stockés pour job {job_id}")
+            job_data['custom_search_terms'] = search_terms
+        if cookies:
+            job_data['user_cookies'] = cookies
+        if job_data:
+            db.update_job_data(job_id, job_data)
         
         logger.info(f"Job créé: {job_id} - URL: {url or '(termes de recherche uniquement)'}, search_terms: {search_terms or '(extraction automatique)'}")
         

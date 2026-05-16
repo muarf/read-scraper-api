@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Presse Scraper</string>
+    <string name="title_activity_main">Presse Scraper</string>
+    <string name="package_name">io.qzz.pressecraper</string>
+    <string name="custom_url_scheme">io.qzz.pressecraper</string>
+</resources>
