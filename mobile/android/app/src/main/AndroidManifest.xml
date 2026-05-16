@@ -12,7 +12,7 @@
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
-            android:label="@string/title_activity_main"
+            android:label="@string/app_name"
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true">
@@ -36,12 +36,15 @@
                 <data android:mimeType="text/html" />
             </intent-filter>
 
-            <!-- Recevoir depuis le menu "Rechercher" du texte sélectionné -->
+            <!-- Recevoir depuis le menu contextuel de sélection de texte -->
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.process_text"
+                android:resource="@xml/process_text_config" />
 
             <!-- Recevoir des URLs -->
             <intent-filter>
