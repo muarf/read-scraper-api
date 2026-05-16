@@ -567,3 +567,16 @@ header p {
 
 
 
+
+.btn-primary {
+    background: #667eea;
+}
+
+.btn-secondary {
+    background: #7f8c8d;
+}
+
+.btn-secondary:hover {
+    background: #6c7a7b;
+    box-shadow: 0 5px 15px rgba(127, 140, 141, 0.3);
+}

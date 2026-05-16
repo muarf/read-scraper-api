@@ -57,13 +57,21 @@
             <div id="resultSection" class="result-section" style="display: none;">
                 <div class="article-preview">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 id="articleTitle"></h2>
-                        <a id="pdfLinkTop" href="#" class="btn btn-primary" download>
-                            <i class="fas fa-download"></i> Télécharger le PDF
-                        </a>
+                        <h2 id="articleTitle" style="margin: 0;"></h2>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <a id="shareLinkTop" href="#" class="btn btn-secondary" target="_blank" style="display: none;">
+                                <i class="fas fa-external-link-alt"></i> Voir l'article
+                            </a>
+                            <a id="pdfLinkTop" href="#" class="btn btn-primary" download>
+                                <i class="fas fa-download"></i> Télécharger le PDF
+                            </a>
+                        </div>
                     </div>
                     <div id="articleContent"></div>
-                    <div class="actions">
+                    <div class="actions" style="display: flex; gap: 10px;">
+                        <a id="shareLink" href="#" class="btn btn-secondary" target="_blank" style="display: none;">
+                            <i class="fas fa-external-link-alt"></i> Voir l'article
+                        </a>
                         <a id="pdfLink" href="#" class="btn btn-primary" download>
                             <i class="fas fa-download"></i> Télécharger le PDF
                         </a>
@@ -584,13 +592,19 @@
                 const data = await response.json();
                 debugLog('Données de réponse', data);
 
-                if (data.job_id) {
+                if (data.status === 'completed' && data.article_id) {
+                    debugLog('Article déjà en cache', { articleId: data.article_id });
+                    showStatus('✅ Article trouvé en cache!');
+                    loadArticle(data.article_id);
+                    // Masquer l'indicateur d'étape car c'est un cache hit
+                    document.getElementById('currentStepIndicator').style.display = 'none';
+                } else if (data.job_id) {
                     debugLog('Job créé avec succès', { jobId: data.job_id });
                     showStatus('Job créé, traitement en cours...');
                     pollJobStatus(data.job_id);
                 } else {
-                    debugLog('Pas de job_id dans la réponse', data);
-                    throw new Error(data.message || 'Erreur lors de la création du job');
+                    debugLog('Pas de job_id ni de cache hit dans la réponse', data);
+                    throw new Error(data.message || 'Impossible de démarrer le scraping');
                 }
             } catch (error) {
                 debugLog('Erreur dans handleScrape', error);
@@ -882,10 +896,23 @@
 
                 // Utiliser la route publique pour télécharger le PDF
                 const pdfPath = `/article/${article.id}/pdf`;
+                const sharePath = `/article/${article.id}`;
                 debugLog('Chemin PDF', { original: article.pdf_path, final: pdfPath, articleId: article.id });
 
                 document.getElementById('pdfLink').href = pdfPath;
                 document.getElementById('pdfLinkTop').href = pdfPath;
+
+                // Mettre à jour les liens de partage
+                const shareLink = document.getElementById('shareLink');
+                const shareLinkTop = document.getElementById('shareLinkTop');
+                if (shareLink) {
+                    shareLink.href = sharePath;
+                    shareLink.style.display = 'inline-block';
+                }
+                if (shareLinkTop) {
+                    shareLinkTop.href = sharePath;
+                    shareLinkTop.style.display = 'inline-block';
+                }
 
                 resultSection.style.display = 'block';
                 statusSection.style.display = 'none';
@@ -926,14 +953,27 @@
             const downloadLink = document.createElement('a');
             downloadLink.href = `/article/${article.id}/pdf`;
             downloadLink.className = 'btn btn-sm';
+            downloadLink.title = 'Télécharger le PDF';
             downloadLink.download = true;
 
             const downloadIcon = document.createElement('i');
             downloadIcon.className = 'fas fa-download';
             downloadLink.appendChild(downloadIcon);
 
+            const viewLink = document.createElement('a');
+            viewLink.href = `/article/${article.id}`;
+            viewLink.className = 'btn btn-sm btn-secondary';
+            viewLink.target = '_blank';
+            viewLink.title = 'Voir la version HTML (lien partageable)';
+            viewLink.style.marginLeft = '5px';
+
+            const viewIcon = document.createElement('i');
+            viewIcon.className = 'fas fa-external-link-alt';
+            viewLink.appendChild(viewIcon);
+
             item.appendChild(infoDiv);
             item.appendChild(downloadLink);
+            item.appendChild(viewLink);
 
             historyList.insertBefore(item, historyList.firstChild);
         }
