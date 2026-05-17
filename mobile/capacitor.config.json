@@ -1,5 +1,10 @@
 {
   "appId": "io.qzz.pressecraper",
   "appName": "Presse Scraper",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "BnfLogin": {
+      "package": "io.qzz.pressecraper.BnfLoginPlugin"
+    }
+  }
 }
