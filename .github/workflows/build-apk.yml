@@ -42,6 +42,32 @@ jobs:
         working-directory: ./mobile
         run: npx cap sync android
 
+      - name: Register BnfLogin plugin
+        run: |
+          PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"
+          if [ -f "$PLUGINS_FILE" ]; then
+            # Add BnfLogin plugin to the array
+            python3 -c "
+          import json
+          with open('$PLUGINS_FILE', 'r') as f:
+              plugins = json.load(f)
+          # Check if BnfLogin is already registered
+          if not any(p.get('classpath', '').endswith('BnfLoginPlugin') for p in plugins):
+              plugins.append({
+                  'pkg': 'BnfLogin',
+                  'classpath': 'io.qzz.pressecraper.BnfLoginPlugin'
+              })
+              with open('$PLUGINS_FILE', 'w') as f:
+                  json.dump(plugins, f, indent=2)
+              print('BnfLogin plugin registered')
+          else:
+              print('BnfLogin plugin already registered')
+          "
+          else
+            echo "capacitor.plugins.json not found, creating..."
+            echo '[{"pkg":"BnfLogin","classpath":"io.qzz.pressecraper.BnfLoginPlugin"}]' > "$PLUGINS_FILE"
+          fi
+
       - name: Build APK
         working-directory: ./mobile/android
         run: ./gradlew assembleDebug --no-daemon
