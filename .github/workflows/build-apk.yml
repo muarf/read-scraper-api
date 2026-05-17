@@ -46,12 +46,10 @@ jobs:
         run: |
           PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"
           if [ -f "$PLUGINS_FILE" ]; then
-            # Add BnfLogin plugin to the array
             python3 -c "
           import json
           with open('$PLUGINS_FILE', 'r') as f:
               plugins = json.load(f)
-          # Check if BnfLogin is already registered
           if not any(p.get('classpath', '').endswith('BnfLoginPlugin') for p in plugins):
               plugins.append({
                   'pkg': 'BnfLogin',
@@ -66,6 +64,19 @@ jobs:
           else
             echo "capacitor.plugins.json not found, creating..."
             echo '[{"pkg":"BnfLogin","classpath":"io.qzz.pressecraper.BnfLoginPlugin"}]' > "$PLUGINS_FILE"
+          fi
+
+      - name: Allow cleartext HTTP traffic
+        run: |
+          MANIFEST="mobile/android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            # Add usesCleartextTraffic="true" to <application> tag
+            sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST"
+            echo "Patched AndroidManifest.xml"
+            grep "usesCleartextTraffic" "$MANIFEST"
+          else
+            echo "AndroidManifest.xml not found!"
+            find mobile/android -name "AndroidManifest.xml" 2>/dev/null
           fi
 
       - name: Build APK
