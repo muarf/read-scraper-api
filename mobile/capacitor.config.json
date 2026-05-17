@@ -2,6 +2,14 @@
   "appId": "io.qzz.pressecraper",
   "appName": "Presse Scraper",
   "webDir": "www",
+  "server": {
+    "cleartextTrafficPermitted": true,
+    "allowNavigation": [
+      "http://141.145.223.71:5000",
+      "http://*",
+      "https://*"
+    ]
+  },
   "plugins": {
     "BnfLogin": {
       "package": "io.qzz.pressecraper.BnfLoginPlugin"

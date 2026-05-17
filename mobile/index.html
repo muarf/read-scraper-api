@@ -311,11 +311,13 @@
     const $ = id => document.getElementById(id);
 
     // ===== TOAST =====
+    let toastTimer = null;
     function toast(msg, type='') {
         const el = $('toast');
         $('toastText').textContent = msg;
         el.className = 'toast ' + type + ' show';
-        setTimeout(() => el.classList.remove('show'), 3000);
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
     }
 
     // ===== NAV =====
