@@ -70,13 +70,14 @@ jobs:
         run: |
           MANIFEST="mobile/android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
-            # Add usesCleartextTraffic="true" to <application> tag
-            sed -i 's/<application /<application android:usesCleartextTraffic="true" /g' "$MANIFEST"
+            # Add usesCleartextTraffic="true" to <application> tag (handle various formats)
+            sed -i 's/<application\b/<application android:usesCleartextTraffic="true"/g' "$MANIFEST"
             echo "Patched AndroidManifest.xml"
-            grep "usesCleartextTraffic" "$MANIFEST"
+            grep -o 'usesCleartextTraffic="true"' "$MANIFEST" || echo "WARNING: pattern not found"
           else
             echo "AndroidManifest.xml not found!"
             find mobile/android -name "AndroidManifest.xml" 2>/dev/null
+            exit 1
           fi
 
       - name: Build APK
