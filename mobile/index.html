@@ -677,6 +677,11 @@
         toast('Cache vidé', 'success');
     });
 
+    // ===== SCRAPE BUTTON =====
+    $('scrapeBtn').addEventListener('click', startScraping);
+    $('cancelBtn').addEventListener('click', cancelJob);
+    $('downloadBtn').addEventListener('click', () => downloadPdf($('downloadBtn').dataset.id));
+
     // ===== CAPACITOR INTEGRATION =====
     function initCapacitor() {
         if (typeof window.Capacitor === 'undefined') {
