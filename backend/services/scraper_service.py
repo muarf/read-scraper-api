@@ -15,10 +15,10 @@ import re
 
 # Ajouter le chemin des modules existants
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from web_scraper.chrome_driver_login import login_to_target_site
-from web_scraper.chrome_driver_search import search_target_site
-from web_scraper.extract_title import extract_title
-from web_scraper.download_article import download_article, sanitize_filename
+from web_scraper.europresse_login import login_to_europresse_bnf
+from web_scraper.europresse_search import search_europresse_target
+from web_scraper.europresse_download import download_europresse_article, sanitize_filename
+from web_scraper.extract_title import extract_title, extract_metadata
 from common.utils import generate_id, file_exists, NoResultException, KeywordsNeededException
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -34,6 +34,7 @@ class ScraperService:
         self.db = db
         self.pdf_service = pdf_service
         self.browser = None
+        self._cookies = []
         # Initialisation lazy - seulement quand nécessaire
         self._browser_initialized = False
 
@@ -49,48 +50,34 @@ class ScraperService:
         except Exception as e:
             logger.warning(f"Erreur lors du nettoyage des fichiers de debug pour le job {job_id}: {e}")
 
-    def _inject_cookies(self, cookies: list):
-        """
-        Injecter des cookies utilisateur dans la session Selenium.
-        Les cookies doivent être une liste d'objets {name, value, domain, path, ...}
-        """
-        if not cookies or not self.browser:
-            return
-
-        logger.info(f"Injection de {len(cookies)} cookies utilisateur")
-        for cookie in cookies:
-            try:
-                cookie_dict = {
-                    'name': cookie.get('name', ''),
-                    'value': cookie.get('value', ''),
-                }
-                if 'domain' in cookie:
-                    cookie_dict['domain'] = cookie['domain']
-                if 'path' in cookie:
-                    cookie_dict['path'] = cookie['path']
-                if 'secure' in cookie:
-                    cookie_dict['secure'] = cookie['secure']
-                if 'httpOnly' in cookie:
-                    cookie_dict['httpOnly'] = cookie['httpOnly']
-
-                self.browser.add_cookie(cookie_dict)
-                logger.debug(f"Cookie injecté: {cookie_dict['name']} (domain: {cookie_dict.get('domain', 'N/A')})")
-            except Exception as e:
-                logger.warning(f"Erreur injection cookie {cookie.get('name', '?')}: {e}")
-
-        logger.info("Cookies injectés avec succès")
-
     def _ensure_browser(self):
-        """S'assurer que le navigateur est initialisé (sans forcément se connecter)"""
+        """S'assurer que le navigateur est initialisé (seulement si pas de cookies utilisateur)"""
+        # Si on a déjà des cookies utilisateur, pas besoin du navigateur
+        if self._cookies and len(self._cookies) > 0:
+            return
         if not self._browser_initialized:
             logger.info("Initialisation lazy du navigateur")
             self._init_browser()
             self._browser_initialized = True
 
+    def _update_ophirofox(self):
+        """Mise à jour automatique des scripts Ophirofox via Git"""
+        try:
+            import subprocess
+            op_path = Path(__file__).resolve().parent.parent.parent / "web_scraper" / "ophirofox"
+            if op_path.exists() and (op_path / ".git").exists():
+                logger.info("[OPHIROFOX] Mise à jour des scripts via git pull...")
+                subprocess.run(["git", "pull"], cwd=str(op_path), check=True, capture_output=True)
+                logger.info("[OPHIROFOX] Scripts mis à jour avec succès.")
+            else:
+                logger.warning(f"[OPHIROFOX] Dossier git introuvable à {op_path}, mise à jour impossible.")
+        except Exception as e:
+            logger.warning(f"[OPHIROFOX] Erreur lors de la mise à jour : {e}")
+
     def _ensure_login(self):
-        """S'assurer qu'on est connecté à Tagaday"""
+        """S'assurer qu'on est connecté à Europresse"""
         if not hasattr(self, '_logged_in') or not self._logged_in:
-            logger.info("Connexion à Tagaday...")
+            logger.info("Connexion à Europresse...")
             self._login()
             self._logged_in = True
 
@@ -135,6 +122,7 @@ class ScraperService:
 
     def _init_browser(self):
         """Initialiser le navigateur Chrome"""
+        import platform
         logger.info("[BROWSER_INIT] Début initialisation navigateur")
         
         # Recharger dynamiquement CHROME_PATH depuis le fichier de config pour utiliser la configuration mise à jour
@@ -167,30 +155,84 @@ class ScraperService:
         chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--disable-software-rasterizer')
         
+        # Liste des chemins de drivers à tenter
+        drivers_to_try = [CHROMEDRIVER_PATH]
+        
+        # Sur ARM64 (aarch64), si Chromium est un Snap, privilégier le binaire DIRECT
+        # pour éviter les erreurs de confinement Snap (Status code 1)
+        if platform.machine() == 'aarch64':
+            direct_snap_driver = "/snap/chromium/current/usr/lib/chromium-browser/chromedriver"
+            wrapper_snap_driver = "/snap/bin/chromium.chromedriver"
+            
+            # Ajouter le binaire direct en PREMIER
+            if os.path.exists(direct_snap_driver):
+                drivers_to_try.insert(0, direct_snap_driver)
+                logger.info(f"[BROWSER_INIT] ARM64: Priorité au binaire Snap DIRECT: {direct_snap_driver}")
+            elif os.path.exists(wrapper_snap_driver):
+                drivers_to_try.insert(0, wrapper_snap_driver)
+                logger.info(f"[BROWSER_INIT] ARM64: Utilisation du wrapper Snap: {wrapper_snap_driver}")
+
+        last_exception = None
+        for driver_path in drivers_to_try:
+            try:
+                logger.info(f"[BROWSER_INIT] Tentative avec le pilote: {driver_path}")
+                from selenium.webdriver.chrome.service import Service
+                service = Service(executable_path=driver_path)
+                self.browser = webdriver.Chrome(service=service, options=chrome_options)
+                logger.info(f"[BROWSER_INIT] Succès avec {driver_path}")
+                return # Succès !
+            except Exception as e:
+                logger.warning(f"[BROWSER_INIT] Échec avec {driver_path}: {e}")
+                last_exception = e
+        
+        # Tentative de repli via chromedriver-autoinstaller si tout a échoué
+        logger.info("[BROWSER_INIT] Tentatives directes échouées, essai via chromedriver-autoinstaller...")
         try:
-            # Utiliser chromedriver-autoinstaller pour installer et gérer automatiquement le bon chromedriver
             import chromedriver_autoinstaller
-            driver_path = chromedriver_autoinstaller.install()
-            
-            from selenium.webdriver.chrome.service import Service
-            service = Service(driver_path) if driver_path else Service()
-            
-            self.browser = webdriver.Chrome(service=service, options=chrome_options)
-            logger.info(f"Navigateur Chrome initialisé avec succès (headless={HEADLESS}) via autoinstaller")
-        except Exception as e:
-            logger.error(f"Erreur initialisation Chrome avec autoinstaller: {e}")
-            raise
+            autopath = chromedriver_autoinstaller.install()
+            if autopath:
+                from selenium.webdriver.chrome.service import Service
+                service = Service(executable_path=autopath)
+                self.browser = webdriver.Chrome(service=service, options=chrome_options)
+                logger.info(f"[BROWSER_INIT] Succès via autoinstaller: {autopath}")
+                return
+            else:
+                logger.error("[BROWSER_INIT] Autoinstaller n'a pas retourné de chemin valide.")
+        except Exception as e2:
+            logger.error(f"[BROWSER_INIT] Échec de l'autoinstaller: {e2}")
+            # On garde l'exception initiale si l'autoinstaller échoue aussi
+        
+        if last_exception:
+            raise last_exception
+        else:
+            raise Exception("Impossible d'initialiser le navigateur Chrome (toutes les méthodes ont échoué)")
     
-    def _login(self):
-        """Se connecter au site cible"""
+    def _login(self, user_cookies=None):
+        """
+        Se connecter à Europresse via EZProxy BnF.
+        Si user_cookies est fourni, les utiliser directement (cookie-relay depuis l'app).
+        Sinon, faire le login BnF avec les credentials .env.
+        """
+        if user_cookies and len(user_cookies) > 0:
+            logger.info(f"[LOGIN] Utilisation des cookies utilisateur ({len(user_cookies)} cookies)")
+            self._cookies = user_cookies
+            return
+
         try:
-            logger.info("[LOGIN] Début connexion au site cible")
+            logger.info("[LOGIN] Début connexion BnF CAS (credentials .env)")
             logger.info(f"[LOGIN] Navigateur: {self.browser}")
-            login_to_target_site(None, None, self.browser, USERNAME, PASSWORD, None)
-            logger.info("[LOGIN] Connexion réussie")
+            _, cookies = login_to_europresse_bnf(None, None, self.browser, USERNAME, PASSWORD, "bg_session")
+            if cookies:
+                self._cookies = cookies
+                logger.info("[LOGIN] Connexion BnF réussie, cookies extraits")
+            else:
+                logger.warning("[LOGIN] Connexion BnF échouée, pas de cookies retournés")
             logger.info(f"[LOGIN] Navigateur après connexion: {self.browser}")
+            self.browser.quit()
+            self.browser = None
+            self._browser_initialized = False
         except Exception as e:
-            logger.warning(f"[LOGIN] Erreur connexion, on continue: {e}")
+            logger.warning(f"[LOGIN] Erreur connexion BnF, on continue: {e}")
 
 
     def _get_browser(self):
@@ -218,26 +260,6 @@ class ScraperService:
         # S'assurer que le navigateur est initialisé
         self._ensure_browser()
 
-        # Injecter les cookies utilisateur si fournis (avant toute navigation)
-        job = self.db.get_job(job_id)
-        if job and job.get('status') == 'completed':
-            self._cleanup_job_screenshots(job_id)
-        job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
-        user_cookies = job_data.get('user_cookies', [])
-        if user_cookies:
-            # Naviguer d'abord sur le domaine de base pour pouvoir injecter les cookies
-            # (Selenium requiert d'être sur le domaine avant d'ajouter un cookie)
-            try:
-                # Extraire le domaine de l'URL cible pour la navigation initiale
-                parsed_target = urlp.urlparse(url if not url.startswith('search_terms:') else 'https://www.liberation.fr')
-                base_url = f"{parsed_target.scheme}://{parsed_target.netloc}"
-                self.browser.get(base_url)
-                logger.info(f"[{job_id}] Navigation initiale sur {base_url} pour injection cookies")
-                time.sleep(2)
-            except Exception as e:
-                logger.warning(f"[{job_id}] Erreur navigation initiale pour cookies: {e}")
-            self._inject_cookies(user_cookies)
-
         try:
             logger.info(f"[{job_id}] === DÉBUT DU SCRAPING ===")
             logger.info(f"[{job_id}] URL: {url}")
@@ -245,6 +267,10 @@ class ScraperService:
             browser = None  # Navigateur potentiel pour l'extraction du titre
 
             # Vérifier si des termes de recherche personnalisés ont été fournis
+            job = self.db.get_job(job_id)
+            if job and job.get('status') == 'completed':
+                self._cleanup_job_screenshots(job_id)
+            job_data = json.loads(job.get('data', '{}')) if job and job.get('data') else {}
             custom_search_terms = job_data.get('custom_search_terms')
             
             # Détecter si c'est un job avec seulement des search_terms (URL placeholder)
@@ -279,6 +305,7 @@ class ScraperService:
             else:
                 # Étape 1: Extraire le titre (utilise le navigateur initialisé mais pas encore connecté)
                 logger.info(f"[{job_id}] === ÉTAPE 1: Extraction du titre ===")
+                logger.info(f"[{job_id}] Appel de extract_title pour URL: {url}")
                 
                 # Mettre à jour l'étape actuelle
                 self.db.update_job_data(job_id, {
@@ -286,19 +313,22 @@ class ScraperService:
                     'step_description': 'Analyse de l\'URL et extraction du titre...'
                 })
                 
-                # Utiliser le navigateur déjà initialisé pour extraire le titre du site source
+                # Utiliser le navigateur déjà initialisé pour extraire le titre et la date du site source
                 browser = self.browser
-                result = extract_title(url, browser)
-                logger.info(f"[{job_id}] Résultat extract_title avec navigateur (avant login): {result}")
+                result = extract_metadata(url, browser)
+                logger.info(f"[{job_id}] Résultat extract_metadata Ophirofox: {result}")
 
                 if result is None or not result[0]:
-                    error_msg = f"Impossible d'extraire des mots-clés de l'URL {url}. Vous semblez être bloqué par le site (ex: Libération) ou la page ne contient pas assez d'information. Veuillez essayer en fournissant directement des mots-clés de recherche."
+                    error_msg = f"Impossible d'extraire des mots-clés de l'URL {url} via Ophirofox. Veuillez essayer en fournissant directement des mots-clés de recherche."
                     logger.error(f"[{job_id}] {error_msg}")
                     raise KeywordsNeededException(error_msg)
 
-                query, title = result
-                logger.info(f"[{job_id}] Titre extrait: '{title}'")
-                logger.info(f"[{job_id}] Query généré: '{query}'")
+                query, title, published_date = result
+                logger.info(f"[{job_id}] Titre: '{title}', Date: '{published_date}', Query: '{query}'")
+                
+                # Stocker la date dans les données du job pour Europresse
+                if published_date:
+                    self.db.update_job_data(job_id, {'published_date': published_date})
 
             # Stocker les termes de recherche dans les données du job
             self.db.update_job_data(job_id, {
@@ -357,19 +387,18 @@ class ScraperService:
                         'pdf_path': str(pdf_path)
                     })
 
-            # Étape 3: Recherche sur Tagaday
-            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche Tagaday ===")
+            # Étape 3: Recherche sur Europresse HttpRequest
+            logger.info(f"[{job_id}] === ÉTAPE 3: Recherche Europresse HTTP ===")
 
-            # S'assurer d'être connecté à Tagaday AVANT la recherche
-            # ensure_login navigue vers Tagaday si on n'y est pas déjà
-            self._ensure_login()
+            # Récupérer les cookies utilisateur si fournis (cookie-relay depuis l'app)
+            user_cookies = job_data.get('user_cookies', [])
 
-            # Screenshot avant la recherche
+            # S'assurer d'être connecté à Europresse (CAS BnF) AVANT la recherche
+            logger.info(f"[{job_id}] Appel de _ensure_login...")
+            self._ensure_login(user_cookies=user_cookies if user_cookies else None)
+            logger.info(f"[{job_id}] _ensure_login terminé. Cookies présents: {len(self._cookies) > 0}")
+
             try:
-                debug_screenshot_path = STATIC_DIR / f"debug_before_search_{job_id}_{int(time.time())}.png"
-                self.browser.save_screenshot(str(debug_screenshot_path))
-                logger.info(f"[{job_id}] Screenshot avant recherche: {debug_screenshot_path}")
-
                 # Mettre à jour les données du job avec l'étape actuelle
                 self.db.update_job_data(job_id, {
                     'search_terms': query,
@@ -378,23 +407,27 @@ class ScraperService:
                     'step_description': 'Recherche d\'articles similaires en cours...'
                 })
             except Exception as ss_error:
-                logger.warning(f"[{job_id}] Impossible de prendre screenshot avant recherche: {ss_error}")
+                logger.warning(f"[{job_id}] Erreur update state: {ss_error}")
 
-            logger.info(f"[{job_id}] ENVOI À LA RECHERCHE - Query: '{query}' (len={len(query)}), Title: '{title[:50]}...'")
-            search_result = search_target_site(None, None, browser, query, title, job_id)
-            logger.info(f"[{job_id}] Résultat recherche: {search_result}")
+            logger.info(f"[{job_id}] ENVOI À LA RECHERCHE HTTP - Query: '{query}' (len={len(query)}), Title: '{title[:50]}...'")
+            
+            # Récupérer la date de publication si disponible
+            published_date = job_data.get('published_date')
+            
+            articles = search_europresse_target(None, None, self._cookies, query, title, job_id, published_date)
+            logger.info(f"[{job_id}] Résultat recherche ({len(articles) if articles else 0} résultats)")
+            
+            if not articles:
+                logger.warning(f"[{job_id}] Liste d'articles vide après search_europresse_target")
 
             # Mettre à jour les données de debug avec les résultats de recherche
-            if search_result and isinstance(search_result, (list, tuple)) and len(search_result) > 1:
-                browser_results, articles = search_result
+            if articles and isinstance(articles, list) and len(articles) > 0:
                 # Calculer les statistiques de recherche
-                total_articles = len(articles) if articles else 0
-                best_match = None
-                if articles and isinstance(articles, list):
-                    try:
-                        best_match = max(articles, key=lambda x: x.get('percentage', 0))
-                    except (ValueError, TypeError):
-                        best_match = articles[0] if articles else None
+                total_articles = len(articles)
+                try:
+                    best_match = max(articles, key=lambda x: x.get('percentage', 0))
+                except (ValueError, TypeError):
+                    best_match = articles[0]
 
                 self.db.update_job_data(job_id, {
                     'search_results_count': total_articles,
@@ -402,22 +435,15 @@ class ScraperService:
                     'best_match_percentage': best_match.get('percentage', 0) if best_match else 0,
                     'best_match_source': best_match.get('logo') if best_match else None
                 })
+            else:
+                articles = None
+                best_match = None
 
-            if search_result is None:
-                # Screenshot en cas d'échec de recherche
-                try:
-                    error_screenshot_path = STATIC_DIR / f"debug_search_failed_{job_id}_{int(time.time())}.png"
-                    browser.save_screenshot(str(error_screenshot_path))
-                    logger.info(f"[{job_id}] Screenshot d'échec de recherche: {error_screenshot_path}")
-                except Exception as ss_error:
-                    logger.warning(f"[{job_id}] Impossible de prendre screenshot d'échec: {ss_error}")
-
+            if not articles:
+                logger.warning(f"[{job_id}] Aucun résultat retourné de HTTP search.")
                 raise NoResultException("Aucun résultat trouvé pour cet article")
             
-            _, results_data = search_result
-            
-            if not results_data or len(results_data) == 0:
-                raise NoResultException("Aucun résultat trouvé")
+            results_data = articles
             
             # Déterminer le site source depuis l'URL
             parsed_url = urlp.urlparse(url)
@@ -431,8 +457,14 @@ class ScraperService:
                 'mediapart.fr': 'mediapart',
                 'www.lemonde.fr': 'le monde',
                 'lemonde.fr': 'le monde',
-                'www.lesjours.fr': 'lesjours.fr',
-                'lesjours.fr': 'lesjours.fr',
+                'www.lesjours.fr': 'les jours',
+                'lesjours.fr': 'les jours',
+                'www.leparisien.fr': 'le parisien',
+                'leparisien.fr': 'le parisien',
+                'www.lexpress.fr': 'l\'express',
+                'lexpress.fr': 'l\'express',
+                'www.lefigaro.fr': 'le figaro',
+                'lefigaro.fr': 'le figaro',
             }
             
             source_key = None
@@ -441,24 +473,35 @@ class ScraperService:
                     source_key = source
                     break
             
-            # Collecter tous les résultats du même site source
-            site_results = []
-            if source_key:
-                for result in results_data:
-                    logo_lower = result.get('logo', '').lower()
-                    logger.info(f"[{job_id}] Vérification du résultat: {logo_lower} (cherche: {source_key}) - Longueur: {result.get('length', 0)} mots")
-                    if source_key in logo_lower or logo_lower in source_key:
-                        site_results.append(result)
-                        logger.info(f"[{job_id}] Résultat du site source trouvé!")
-
-            # Si on a des résultats du site source, prendre celui avec le plus de mots
-            if site_results:
-                best_match = max(site_results, key=lambda x: x.get('length', 0))
-                logger.info(f"[{job_id}] Sélection du résultat le plus long: {best_match.get('length', 0)} mots - Site: {best_match.get('logo', 'inconnu')}")
+            # Scoring intelligent : Combiner similarité, longueur et correspondance de source
+            scored_results = []
+            for result in results_data:
+                logo_lower = result.get('logo', '').lower()
+                similarity = result.get('percentage', 0)
+                length = result.get('length', 0)
+                
+                # Bonus pour la correspondance de source
+                source_bonus = 0
+                if source_key and (source_key in logo_lower or logo_lower in source_key):
+                    source_bonus = 30
+                    logger.info(f"[{job_id}] Bonus source (+30) pour: {logo_lower}")
+                
+                # Bonus pour la longueur (max 20 points pour 2000 mots)
+                length_bonus = min(20, (length / 100))
+                
+                total_score = similarity + source_bonus + length_bonus
+                result['total_score'] = total_score
+                scored_results.append(result)
+            
+            # Trier par le score total
+            scored_results = sorted(scored_results, key=lambda x: x['total_score'], reverse=True)
+            
+            if scored_results:
+                best_match = scored_results[0]
+                logger.info(f"[{job_id}] Meilleur match sélectionné: {best_match.get('title')} (Score: {best_match['total_score']:.1f}, %: {best_match['percentage']}, Source: {best_match.get('logo')})")
             else:
-                # Si pas de correspondance exacte, prendre le meilleur résultat
-                best_match = results_data[0]
-                logger.warning(f"[{job_id}] Aucune correspondance exacte trouvée, utilisation du meilleur résultat")
+                logger.warning(f"[{job_id}] Aucun résultat retourné après scoring.")
+                raise NoResultException("Aucun résultat trouvé pour cet article")
             
             link = best_match['link']
             percentage = best_match['percentage']
@@ -476,9 +519,9 @@ class ScraperService:
                 'source_site': best_match.get('logo', 'inconnu')
             })
             
-            # Étape 4: Télécharger le contenu de l'article
-            logger.info(f"[{job_id}] Téléchargement du contenu...")
-            html_content = download_article(None, None, browser, link, job_id)
+            # Étape 4: Télécharger le contenu de l'article HTTP
+            logger.info(f"[{job_id}] Téléchargement du contenu (HTTP)...")
+            html_content = download_europresse_article(None, None, link, self._cookies, job_id)
 
             if html_content is None:
                 raise Exception("Impossible de télécharger le contenu de l'article")

@@ -5,6 +5,9 @@ import android.os.Bundle;
 import android.util.Log;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.Plugin;
+
+import java.util.ArrayList;
 
 public class MainActivity extends BridgeActivity {
 
@@ -13,6 +16,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Register custom plugins
+        registerPlugin(BnfLoginPlugin.class);
+
         handleIntent(getIntent());
     }
 
@@ -24,10 +31,8 @@ public class MainActivity extends BridgeActivity {
 
     private void handleIntent(Intent intent) {
         if (intent == null) return;
-
         String action = intent.getAction();
         String type = intent.getType();
-
         Log.d(TAG, "Intent: action=" + action + " type=" + type);
 
         if (Intent.ACTION_SEND.equals(action) && type != null) {
@@ -45,7 +50,6 @@ public class MainActivity extends BridgeActivity {
                 String text = processedText.toString();
                 Log.d(TAG, "PROCESS_TEXT: " + text);
                 notifyJs("sharedText", text);
-                // Retourner le texte traité (optionnel, pour le système)
                 Intent resultIntent = new Intent();
                 resultIntent.putExtra(Intent.EXTRA_PROCESS_TEXT, text);
                 setResult(RESULT_OK, resultIntent);

@@ -10,6 +10,11 @@ class NoResultException(Exception):
     pass
 
 
+class KeywordsNeededException(Exception):
+    """Exception pour indiquer que des mots-clés sont nécessaires pour continuer"""
+    pass
+
+
 def generate_id(length):
     # Utiliser seulement des caractères alphanumériques et -_
     alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'

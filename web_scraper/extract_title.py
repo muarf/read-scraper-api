@@ -3,363 +3,207 @@
 import requests
 from bs4 import BeautifulSoup, SoupStrainer
 import string
-from collections import Counter
 import re
 from datetime import datetime
 import time
+import unicodedata
 from common.utils import send_message_to_client
+from web_scraper.ophirofox_bridge import OphirofoxEngine
 
-def _try_google_fallback(url, browser):
-    """Fallback : chercher l'URL sur Google pour récupérer le titre depuis les résultats"""
-    try:
-        # Nettoyer l'URL pour la recherche (enlever les paramètres de test ou de tracking)
-        import urllib.parse
-        parsed = urllib.parse.urlparse(url)
-        clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-        
-        print(f"Tentative de fallback Google pour l'URL : {clean_url}")
-        search_url = f"https://www.google.com/search?q={urllib.parse.quote(clean_url)}"
-        browser.get(search_url)
-        
-        # Attendre un peu pour le chargement
-        time.sleep(4)
-        
-        # Gérer le bouton de consentement Google si présent
-        try:
-            # Sélecteurs variés pour le bouton d'acceptation
-            consent_ids = ["L2AGLb", "introAgreeButton", "ack-button"]
-            for cid in consent_ids:
-                try:
-                    btn = browser.find_element("id", cid)
-                    if btn.is_displayed():
-                        btn.click()
-                        time.sleep(2)
-                        break
-                except: continue
-                
-            # Fallback par texte si les IDs échouent
-            consent_texts = ["Tout accepter", "I agree", "Accepter tout", "Agree", "Tout approuver"]
-            buttons = browser.find_elements("tag name", "button")
-            for btn in buttons:
-                if any(text in btn.text for text in consent_texts):
-                    try:
-                        btn.click()
-                        time.sleep(2)
-                        break
-                    except: continue
-        except Exception as e:
-            print(f"Erreur lors de la gestion du consentement : {e}")
+# Initialisation globale du moteur Ophirofox
+ophirofox = OphirofoxEngine(op_dir="/app/web_scraper/ophirofox/ophirofox")
 
-        # Chercher dans les résultats Google
-        print(f"DEBUG Google Title: {browser.title}")
-        if "Google" in browser.title and "Consent" in browser.title:
-            print("AVERTISSEMENT: Toujours sur la page de consentement Google !")
-            
-        # 1. Résultats organiques standards (h3)
-        results = browser.find_elements("tag name", "h3")
-        print(f"DEBUG: Nombre de h3 trouvés: {len(results)}")
-        for res in results:
-            title_candidate = res.text.strip()
-            print(f"DEBUG candidate h3: '{title_candidate}'")
-            # On cherche un titre assez long et qui ne soit pas une catégorie Google
-            if title_candidate and len(title_candidate) > 15:
-                # Éviter les sections de service
-                blacklist = ["vidéo", "recherches associées", "images", "actualités", "maps"]
-                if not any(b in title_candidate.lower() for b in blacklist):
-                    print(f"Titre récupéré via Google (h3) : {title_candidate}")
-                    return title_candidate
-        
-        # 2. Section "À la une" (Top Stories)
-        try:
-            top_stories = browser.find_elements("css selector", "div[role='heading']")
-            for story in top_stories:
-                title_candidate = story.text.strip()
-                if title_candidate and len(title_candidate) > 15:
-                    print(f"Titre récupéré via Google (Top Stories) : {title_candidate}")
-                    return title_candidate
-        except: pass
+def _process_title_to_query(title, max_words=15):
+    """Nettoyage de titre pour Europresse et génération de query"""
+    if not title:
+        return None, None
+    
+    # 1) retirer les suffixes de type " - Le Parisien", " | Le Monde", etc.
+    site_separators = [" - ", " | ", " — ", " · "]
+    title_core = title
+    for sep in site_separators:
+        if sep in title_core:
+            title_core = title_core.split(sep)[0]
+    
+    # 2) normaliser
+    title_core = title_core.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
+    
+    # 3) supprimer la ponctuation
+    extra_punct = "…–—«»\"\"''/"
+    punctuation_chars = string.punctuation + extra_punct
+    title_no_punct = title_core.translate(str.maketrans(punctuation_chars, ' ' * len(punctuation_chars)))
 
-        # 3. Fallback ultime : premier lien qui contient l'URL cible
-        try:
-            links = browser.find_elements("css selector", "div.g a")
-            for link in links:
-                href = link.get_attribute("href")
-                if href and clean_url in href:
-                    h3 = link.find_element("tag name", "h3")
-                    if h3.text:
-                        print(f"Titre récupéré via Google (link h3) : {h3.text}")
-                        return h3.text.strip()
-        except: pass
+    # Découper en mots
+    words = title_no_punct.split()
+    words_to_remove = {
+        "parisien", "leparisien", "leparisienfr", "leparisien.fr", "monde", "lemonde",
+        "figaro", "lefigaro", "liberation", "libération", "mediapart", "telerama",
+        "nouvelobs", "obs", "express", "lexpress", "france", "tv", "radio", "presse", "journal", "quotidien",
+        "hebdo", "magazine", "news", "actu", "info", "actualite", "actualites", "video", "videos", "direct",
+        "continu", "ouest", "regions", "monde", "monde.fr", "le", "la", "les", "du", "de", "des", "d", "au", "aux", 
+        "un", "une", "et", "en", "pour", "dans", "sur", "par", "est", "sont", "avec", "dans", "votre", "suivez", "toute"
+    }
 
-        print("Aucun titre trouvé sur Google Search")
-        return None
-    except Exception as e:
-        print(f"Erreur lors du fallback Google : {e}")
-        return None
-
-def extract_title(url, browser=None, max_words=15):
-    try:
-        print(f"url : {url}")
-
-        # Mesurer le temps de la requête
-        start = time.time()
-
-        title = None
-        is_blocked = False
-
-        # Si un browser est fourni, l'utiliser pour contourner les blocages
-        if browser is not None:
-            try:
-                browser.get(url)
-                # Attendre que la page charge et que le titre soit valide (pas la page anti-DDoS)
-                max_wait = 15  # Augmenter à 15 secondes pour les sites lents
-                wait_interval = 0.5  # Vérifier toutes les 0.5 secondes
-                elapsed = 0
-
-                while elapsed < max_wait:
-                    time.sleep(wait_interval)
-                    elapsed += wait_interval
-                    current_title = browser.title
-                    current_url = browser.current_url
-
-                    if "test-google-fallback" in url:
-                        print("FORCAGE DU BLOCAGE pour test google fallback")
-                        is_blocked = True
-                        break
-                    time.sleep(wait_interval)
-                    elapsed += wait_interval
-                    current_title = browser.title
-                    current_url = browser.current_url
-
-                    # Si le titre est valide (pas vide, pas de pages de protection)
-                    invalid_titles = ["Un instant…", "Just a moment", "Loading...", "Just a moment...",
-                                    "Please wait...", "Checking your browser...", "Verifying...",
-                                    "Cloudflare", "DDoS protection", "Security Check", "Access Denied"]
-                    
-                    # Pattern spécifique pour Libération quand on est bloqué
-                    if "liberation.fr" in current_url.lower() and "bloqué" in current_title.lower():
-                        print(f"Blocage Libération détecté par le titre : {current_title}")
-                        is_blocked = True
-                        break
-
-                    if current_title and not any(invalid in current_title for invalid in invalid_titles):
-                        title = current_title
-                        print(f"Titre obtenu via browser en {time.time() - start:.2f} secondes")
-                        break
-
-                # Si le titre n'est toujours pas valide après l'attente, vérifier le body
-                if not title and not is_blocked:
-                    page_source = browser.page_source.lower()
-                    bot_signals = ["cloudflare", "sucuri", "ddos protection", "captcha", "security check", "hcaptcha"]
-                    if any(signal in page_source for signal in bot_signals):
-                        print("Blocage bot détecté dans la source de la page")
-                        is_blocked = True
-                    
-                    if not is_blocked:
-                        print(f"Titre invalide obtenu après {max_wait}s : {browser.title}, passage à requests")
-                        # Ne pas mettre browser à None ici car on pourrait en avoir besoin pour le fallback Google
-                
-            except Exception as e:
-                print(f"Erreur avec browser : {e}")
-
-        # Si bloqué par un bot, tenter le fallback Google Search si on a un browser
-        if is_blocked and browser:
-            print("Tentative de contournement via Google Search...")
-            title = _try_google_fallback(url, browser)
-        
-        # Si pas encore de titre, tenter requests
-        if not title:
-            # On tente requests seulement si on n'a pas déjà détecté un blocage certain par browser
-            # ou si on n'a pas de browser du tout
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
-            try:
-                # Si on a déjà détecté un blocage browser, requests a peu de chances de réussir
-                # mais on tente quand même au cas où (sauf si on est certain d'être bloqué)
-                print("Tentative via requests...")
-                response = requests.get(url, headers=headers, timeout=15)
-                response.raise_for_status()
-
-                # Parser uniquement le tag <title>
-                soup = BeautifulSoup(response.text, 'html.parser', parse_only=SoupStrainer(["title", "meta"]))
-                title_element = soup.find('title')
-
-                if title_element:
-                    title = title_element.text.strip()
-            except Exception as e:
-                print(f"Erreur requests : {e}")
-
-            # Récupérer le nom du site si disponible
-            site_name = None
-            if title:
-                try:
-                    soup = BeautifulSoup(response.text, 'html.parser') if 'soup' not in locals() else soup
-                    meta_site = soup.find('meta', attrs={'property': 'og:site_name'})
-                    if meta_site and meta_site.get('content'):
-                        site_name = meta_site.get('content').strip()
-                except Exception:
-                    site_name = None
-
-        if not title:
-            print("Aucun titre valide trouvé après toutes les tentatives")
-            return None
-
-        # Vérifier que le titre extrait semble légitime (pas trop court, pas de protection)
-        if len(title.strip()) < 5:
-            print(f"Titre trop court : '{title}', considéré comme invalide")
-            # Tenter Google Fallback ici aussi car un titre trop court est souvent un signe de blocage/redirection
-            if browser:
-                print("Titre trop court, tentative de fallback Google...")
-                title = _try_google_fallback(url, browser)
-                if not title: return None
-            else:
-                return None
-
-        # Vérifier si le titre est juste le nom du domaine
-        from urllib.parse import urlparse
-        import re
-        parsed_url = urlparse(url)
-        domain_parts = parsed_url.netloc.split('.')
-        main_domain = domain_parts[-2] if len(domain_parts) >= 2 else domain_parts[0]
-        
-        title_clean = title.lower().strip()
-        import unicodedata
-        def strip_accents(s):
-            return ''.join(c for c in unicodedata.normalize('NFD', s)
-                          if unicodedata.category(c) != 'Mn')
-        
-        title_no_accents = strip_accents(title_clean)
-        domain_no_accents = strip_accents(main_domain.lower())
-        full_domain_no_accents = strip_accents(parsed_url.netloc.lower().replace('www.', ''))
-
-        if (title_no_accents == domain_no_accents or 
-            title_no_accents == full_domain_no_accents or
-            title_no_accents == "accueil" or
-            title_no_accents == "home"):
-            print(f"Titre générique ou nom de domaine détecté : '{title}', probable blocage")
-            # Une dernière chance via Google si on a un browser
-            if browser:
-                print("Titre générique détecté, tentative de fallback Google...")
-                title = _try_google_fallback(url, browser)
-                if not title: return None
-            else:
-                return None
-
-        # Vérifier les patterns de protection Cloudflare courants
-        cloudflare_patterns = [
-            r'just a moment', r'checking your browser', r'please wait',
-            r'verifying', r'security check', r'cloudflare', r'access denied'
-        ]
-
-        title_lower = title.lower()
-        if any(pattern in title_lower for pattern in cloudflare_patterns):
-            print(f"Titre indique une protection Cloudflare ou blocage : '{title}'")
-            if browser:
-                print("Blocage détecté via patterns, tentative de fallback Google...")
-                title = _try_google_fallback(url, browser)
-                if not title: return None
-            else:
-                return None
-
-        # Traitement du titre pour créer la requête
-        # 1) retirer les suffixes de type " - Le Parisien", " | Le Monde", etc.
-        site_separators = [" - ", " | ", " — ", " · "]
-        title_core = title
-        for sep in site_separators:
-            if sep in title_core:
-                title_core = title_core.split(sep)[0]
-        # 2) normaliser les apostrophes et guillemets typographiques
-        title_core = (
-            title_core
-            .replace("’", "'")
-            .replace("‘", "'")
-            .replace("“", '"')
-            .replace("”", '"')
-        )
-        # 3) supprimer la ponctuation (y compris les slashes)
-        extra_punct = "…–—«»\"\"''/"
-        punctuation_chars = string.punctuation + extra_punct
-        title_no_punct = title_core.translate(str.maketrans(punctuation_chars, ' ' * len(punctuation_chars)))
-
-        # Découper en mots
-        words = title_no_punct.split()
-
-        # Mots à retirer (noms de sites et stopwords FR)
-        words_to_remove = {
-            # médias / domaines
-            "parisien", "leparisien", "leparisienfr", "leparisien.fr", "monde", "lemonde",
-            "figaro", "lefigaro", "liberation", "libération", "mediapart", "telerama",
-            "nouvelobs", "obs", "express", "lexpress", "france", "tv", "radio", "presse", "journal", "quotidien",
-            "hebdo", "magazine", "news", "actu", "info", "actualite", "actualites",
-            # stopwords FR courants
-            "le", "la", "les", "du", "de", "des", "d", "au", "aux", "un", "une", "et",
-            "ou", "sur", "dans", "par", "pour", "avec", "sans", "sous", "chez", "entre",
-            "ce", "cet", "cette", "ces", "qui", "que", "quoi", "quel", "quelle", "quels",
-            "quelles", "est", "sont", "fait", "faites", "faites", "fait", "aujourdhui",
-            "ici", "lors", "contre", "ainsi", "comme", "plus", "moins", "très", "tres"
-        }
-
-        # Stopwords dynamiques à partir du domaine et du og:site_name
-        try:
-            from urllib.parse import urlparse
-            host = urlparse(url).netloc.lower()
-            host_parts = [p for p in re.split(r"[^a-zA-Z0-9]+", host) if p]
-            # Ex: ['www','lexpress','fr'] -> add 'lexpress', 'express' (sans préfixes l/le/la)
-            dynamic = set()
-            for part in host_parts:
-                dynamic.add(part)
-                # variantes sans préfixe article
-                if part.startswith('l') and len(part) > 1:
-                    dynamic.add(part[1:])
-                if part.startswith('le') and len(part) > 2:
-                    dynamic.add(part[2:])
-                if part.startswith('la') and len(part) > 2:
-                    dynamic.add(part[2:])
-            if site_name:
-                # normaliser site_name -> tokens
-                sn = re.sub(r'[^a-zA-Z0-9\s]', ' ', site_name.lower())
-                for tok in sn.split():
-                    if tok:
-                        dynamic.add(tok)
-                        if tok.startswith('l') and len(tok) > 1:
-                            dynamic.add(tok[1:])
-                        if tok.startswith('le') and len(tok) > 2:
-                            dynamic.add(tok[2:])
-                        if tok.startswith('la') and len(tok) > 2:
-                            dynamic.add(tok[2:])
-            # retirer éléments trop courts pour ne pas polluer
-            dynamic = {d for d in dynamic if len(d) > 2}
-            words_to_remove.update(dynamic)
-        except Exception:
-            pass
-
-        # Filtrer les mots et nettoyer les caractères spéciaux
-        filtered_words = []
-        for word in words:
-            # Nettoyer les caractères spéciaux et apostrophes
-            clean_word = re.sub(r'[^\w\s]', '', word.lower())
-            if clean_word and len(clean_word) > 2 and clean_word not in words_to_remove:
+    # Filtrer les mots
+    filtered_words = []
+    seen = set()
+    for word in words:
+        clean_word = re.sub(r'[^\w\s]', '', word.lower())
+        if clean_word and len(clean_word) > 2 and clean_word not in words_to_remove:
+            if clean_word not in seen:
+                seen.add(clean_word)
                 filtered_words.append(clean_word)
 
-        # Déduplication simple en conservant l'ordre
-        seen = set()
-        deduped_words = []
-        for w in filtered_words:
-            if w not in seen:
-                seen.add(w)
-                deduped_words.append(w)
+    # Protection spécifique contre le slogan Ouest-France (si moins de 3 mots significatifs après filtrage)
+    if not filtered_words or len(filtered_words) < 2:
+        return None, None
 
-        # Recomposer la chaîne filtrée (limiter à max_words mots significatifs)
-        query = ' '.join(deduped_words[:max_words])
+    query = ' '.join(filtered_words[:max_words])
+    clean_title = ' '.join(title.replace('/', ' ').replace('\\', ' ').split())
+    return query, clean_title
 
-        # Nettoyer aussi le titre pour l'affichage (remplacer les slashes)
-        clean_title = title.replace('/', ' ').replace('\\', ' ')
-        # Nettoyer les espaces multiples
-        clean_title = ' '.join(clean_title.split())
+def _extract_from_slug(url):
+    """Extraction depuis le slug de l'URL avec nettoyage agressif des IDs techniques"""
+    try:
+        from urllib.parse import urlparse
+        path = urlparse(url).path
+        if not path or path == '/': return None
+        
+        # Récupérer le dernier segment (ex: israel-et-iran_6668678_3210.html)
+        slug = path.split('/')[-1] or path.split('/')[-2]
+        
+        # 1. Supprimer l'extension .html ou .htm
+        slug = re.sub(r'\.html?$', '', slug)
+        
+        # 2. Remplacer les séparateurs par des espaces
+        title = slug.replace('-', ' ').replace('_', ' ')
+        
+        # 3. Supprimer les IDs techniques (suites de chiffres ou code alphanumérique long à la fin)
+        # On le fait plusieurs fois car il peut y en avoir plusieurs (ex: _6668678_3210)
+        title = re.sub(r'\s+[a-zA-Z0-9]{8,}\s*$', '', title)
+        for _ in range(3):
+            title = re.sub(r'\s+\d{2,}\s*$', '', title).strip()
+            
+        return title
+    except: return None
 
-        return query, clean_title
-
-    except Exception as e:
-        print(f"Une erreur s'est produite lors de l'extraction du titre : {e}")
+def _try_google_fallback(url, browser):
+    """Extraction via Google Search"""
+    try:
+        import urllib.parse
+        search_url = f"https://www.google.com/search?q={urllib.parse.quote(url)}"
+        browser.get(search_url)
+        time.sleep(4)
+        results = browser.find_elements("tag name", "h3")
+        for res in results:
+            t = res.text.strip()
+            if t and len(t) > 15: return t
         return None
+    except: return None
+
+def extract_metadata(url, browser=None, max_words=15):
+    """
+    Extraction de métadonnées prioritaires.
+    STRATÉGIE 1 : Ophirofox (Injection JS + Bypass Cookie Wall)
+    STRATÉGIE 2 : Fallback classique (Browser Title / Search Engine)
+    STRATÉGIE 3 : Slug URL (Dernier recours)
+    """
+    query = None
+    title = None
+    published_date = None
+
+    # STRATÉGIE 1 : Ophirofox (Prioritaire comme demandé)
+    if browser is not None:
+        try:
+            print(f"[OPHIROFOX] Tentative d'extraction pour {url}")
+            js_code = ophirofox.get_js_injection(url)
+            
+            if js_code:
+                if browser.current_url != url:
+                    browser.get(url)
+                
+                # Attendre et injecter (bypass cookie wall inclus dans le bridge)
+                time.sleep(3)
+                browser.execute_script(js_code)
+                
+                # Boucle de capture (max 7s pour laisser le temps au bypass d'agir)
+                start_wait = time.time()
+                while time.time() - start_wait < 7:
+                    results = browser.execute_script("return window.ophirofox_results;")
+                    if results:
+                        query_raw = results.get('keywords')
+                        published_date = results.get('published_time')
+                        
+                        if query_raw:
+                            # Rejeter si c'est encore un slogan marketing d'Ouest-France ou assimilé
+                            blacklist = ["direct", "continu", "cookies", "accueil", "home", "instantané", "désolé"]
+                            if any(b in query_raw.lower() for b in blacklist) or len(query_raw) < 15:
+                                print(f"[OPHIROFOX] Résultat suspect, on continue d'attendre...")
+                                time.sleep(1)
+                                continue
+                                
+                            query, title = _process_title_to_query(query_raw, max_words)
+                            print(f"[OPHIROFOX] Succès : Title='{title}'")
+                            return query, title, published_date
+                    time.sleep(0.5)
+                
+                print("[OPHIROFOX] Pas de résultats valides capturés via JS")
+        except Exception as e:
+            print(f"[OPHIROFOX] Erreur bridge : {e}")
+
+    # STRATÉGIE 2 : Fallback Classique (Browser Title & Recherche)
+    res = extract_title(url, browser, max_words)
+    if res:
+        f_query, f_title = res
+        # Liste noire étendue pour détecter les paywalls
+        paywall_blacklist = [
+            "accès restreint", "abonnez-vous", "paywall", "désolé", "restreint", 
+            "connexion", "s'inscrire", "offre", "abonnement", "s'abonner"
+        ]
+        
+        # Si le titre contient un mot de la blacklist, on le rejette
+        is_paywall = any(word in f_title.lower() for word in paywall_blacklist)
+        
+        if f_query and len(f_query.split()) >= 2 and not is_paywall:
+            return f_query, f_title, None
+        print(f"[METADATA] Fallback a renvoyé un titre suspect ou paywall ('{f_title}'), rejeté.")
+    
+    # STRATÉGIE 3 : Slug URL (Vraiment le dernier recours, mais très efficace sur Le Monde)
+    print("[METADATA] Tentative ultime via le slug de l'URL...")
+    slug_title = _extract_from_slug(url)
+    if slug_title and len(slug_title) > 10:
+        query, title = _process_title_to_query(slug_title, max_words)
+        print(f"[METADATA] Titre reconstruit depuis l'URL : '{title}'")
+        return query, title, None
+
+    return None, None, None
+
+def extract_title(url, browser=None, max_words=15):
+    """Méthode de secours classique"""
+    try:
+        title = None
+        if browser is not None:
+            browser.get(url)
+            # Attente d'un titre qui ne ressemble pas à un slogan marketing
+            for _ in range(10):
+                time.sleep(1)
+                t = browser.title
+                if t and len(t) > 20 and not any(m in t.lower() for m in ["direct", "continu", "accueil"]):
+                    title = t
+                    break
+            
+            if not title:
+                title = _try_google_fallback(url, browser)
+
+        if not title:
+            try:
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                r = requests.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(r.text, 'html.parser')
+                if soup.title: title = soup.title.text.strip()
+            except: pass
+
+        if title:
+            return _process_title_to_query(title, max_words)
+        return None
+    except: return None
