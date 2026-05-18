@@ -1,7 +1,7 @@
 """
 Routes API REST pour l'application
 """
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, make_response
 from pathlib import Path
 import json
 from backend.models.database import Database
@@ -12,6 +12,7 @@ from backend.middleware.rate_limiter import RateLimiter
 from backend.config.settings import STATIC_DIR, API_PREFIX
 from common.utils import generate_id
 import hashlib
+import secrets
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour créer un job de scraping
     @api_bp.route('/scrape', methods=['POST'])
+    @auth.require_api_key
     def create_scrape_job():
         """Créer un nouveau job de scraping"""
         data = request.get_json()
@@ -94,6 +96,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour obtenir le statut d'un job
     @api_bp.route('/job/<job_id>', methods=['GET'])
+    @auth.require_api_key
     def get_job_status(job_id):
         """Obtenir le statut d'un job"""
         job = db.get_job(job_id)
@@ -129,6 +132,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour obtenir un article
     @api_bp.route('/article/<article_id>', methods=['GET'])
+    @auth.require_api_key
     def get_article(article_id):
         """Obtenir un article par son ID"""
         article = db.get_article(article_id)
@@ -152,6 +156,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour télécharger le PDF
     @api_bp.route('/article/<article_id>/pdf', methods=['GET'])
+    @auth.require_api_key
     def download_pdf(article_id):
         """Télécharger le PDF d'un article"""
         article = db.get_article(article_id)
@@ -182,7 +187,9 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
                 'message': 'Le fichier PDF n\'existe pas sur le serveur'
             }), 404
         
-        return send_file(str(pdf_path), mimetype='application/pdf')
+        response = make_response(send_file(str(pdf_path), mimetype='application/pdf'))
+        response.headers['Content-Disposition'] = f'inline; filename="{pdf_path.name}"'
+        return response
 
     # Route pour obtenir une clé API temporaire (pour les utilisateurs anonymes)
     @api_bp.route('/get-temp-key', methods=['GET'])
@@ -211,6 +218,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour lister les articles (publique pour le frontend)
     @api_bp.route('/articles', methods=['GET'])
+    @auth.require_api_key
     def list_articles():
         """Lister les articles avec pagination et recherche"""
         limit = request.args.get('limit', 50, type=int)
@@ -248,6 +256,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route de recherche
     @api_bp.route('/search', methods=['GET'])
+    @auth.require_api_key
     def search_articles():
         """Rechercher dans les articles"""
         query = request.args.get('q')
@@ -268,6 +277,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour annuler un job en cours
     @api_bp.route('/job/<job_id>/cancel', methods=['POST'])
+    @auth.require_api_key
     def cancel_job(job_id):
         """Annuler un job en attente ou en cours de traitement"""
         job = db.get_job(job_id)
@@ -304,6 +314,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour rejeter un article (supprimer l'article associé au job)
     @api_bp.route('/job/<job_id>/reject', methods=['POST'])
+    @auth.require_api_key
     def reject_job(job_id):
         """Rejeter et supprimer un article associé à un job"""
         job = db.get_job(job_id)
@@ -371,6 +382,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour lister les screenshots de debug
     @api_bp.route('/debug/screenshots', methods=['GET'])
+    @auth.require_api_key
     def list_debug_screenshots():
         """Lister les screenshots de debug disponibles"""
         try:
@@ -452,6 +464,52 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
                 'error': 'Erreur serveur',
                 'message': str(e)
             }), 500
+
+    # Route pour enregistrer un device et obtenir une clé API permanente
+    @api_bp.route('/register', methods=['POST'])
+    def register_device():
+        """Enregistrer un device et générer une clé API permanente"""
+        data = request.get_json()
+
+        if not data or not data.get('device_id'):
+            return jsonify({
+                'error': 'device_id manquant',
+                'message': 'Vous devez fournir un device_id dans le body JSON'
+            }), 400
+
+        device_id = data['device_id'].strip()
+
+        if not device_id:
+            return jsonify({
+                'error': 'device_id vide',
+                'message': 'Le device_id ne peut pas être vide'
+            }), 400
+
+        # Vérifier si ce device_id a déjà une clé API active
+        existing_key = db.get_api_key_by_device(device_id)
+        if existing_key:
+            return jsonify({
+                'error': 'Device déjà enregistré',
+                'message': 'Ce device_id possède déjà une clé API active. Utilisez-la ou révoquez-la d\'abord.'
+            }), 409
+
+        # Générer une clé API permanente sécurisée
+        raw_key = f"pk_{secrets.token_hex(32)}"
+        key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+
+        # Stocker la clé dans la base (name = device_id pour traçabilité)
+        if db.create_api_key(key_hash, name=f"device:{device_id}", is_admin=False):
+            logger.info(f"Device enregistré: {device_id}")
+            return jsonify({
+                'api_key': raw_key,
+                'device_id': device_id,
+                'message': 'Clé API permanente générée avec succès. Conservez-la, elle ne sera plus affichée.'
+            }), 201
+
+        return jsonify({
+            'error': 'Erreur création clé',
+            'message': 'Impossible de créer la clé API'
+        }), 500
 
     return api_bp
 

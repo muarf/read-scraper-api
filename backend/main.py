@@ -5,6 +5,10 @@ from flask import Flask, render_template, send_from_directory, send_file
 from flask_cors import CORS
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement depuis .env (AVANT les imports de config)
+load_dotenv(str(Path(__file__).resolve().parent.parent / ".env"))
 
 # Ajouter le répertoire racine au path Python
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -97,11 +101,21 @@ global_scraper = None
 
 def scraper_callback(url: str, job_id: str):
     """Callback pour le service de scraping"""
+    import json
     scraper = ScraperService(db, pdf_service)
     logger.info(f"Traitement job {job_id}")
 
     try:
-        return scraper.process_job(job_id)
+        # Récupérer les cookies utilisateur stockés dans les données du job
+        user_cookies = None
+        job = db.get_job(job_id)
+        if job and job.get('data'):
+            job_data = json.loads(job.get('data', '{}'))
+            user_cookies = job_data.get('user_cookies')
+            if user_cookies:
+                logger.info(f"Job {job_id}: {len(user_cookies)} cookies utilisateur trouvés")
+
+        return scraper.scrape_article(url, job_id, user_cookies=user_cookies)
     except Exception as e:
         logger.error(f"Erreur dans scraper_callback pour job {job_id}: {e}")
         raise

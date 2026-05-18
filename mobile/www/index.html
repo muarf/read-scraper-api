@@ -33,11 +33,39 @@
         }
         .header h1 { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
         .header h1 i { color: var(--accent); }
+        .session-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .session-dot.ok { background: var(--success); box-shadow: 0 0 6px var(--success); }
+        .session-dot.expired { background: var(--warning); }
+        .session-dot.none { background: var(--accent); }
 
         /* Screens */
         .screen { display: none; padding: 16px; animation: fadeIn .3s ease; }
         .screen.active { display: block; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+        /* Onboarding */
+        .onboarding { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 32px 24px; }
+        .onboarding .logo { font-size: 48px; margin-bottom: 16px; }
+        .onboarding h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; text-align: center; }
+        .onboarding .subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 32px; text-align: center; line-height: 1.5; }
+        .onboarding .form-group { width: 100%; max-width: 360px; margin-bottom: 16px; }
+        .onboarding .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .onboarding .form-group input {
+            width: 100%; background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 10px; padding: 14px 16px; color: var(--text-primary);
+            font-size: 15px; font-family: inherit; outline: none;
+        }
+        .onboarding .form-group input:focus { border-color: var(--accent); }
+        .onboarding .btn-primary {
+            width: 100%; max-width: 360px; background: var(--accent); color: white;
+            border: none; border-radius: 10px; padding: 14px; font-size: 15px;
+            font-weight: 600; cursor: pointer; margin-top: 8px;
+        }
+        .onboarding .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .onboarding .links { margin-top: 24px; text-align: center; }
+        .onboarding .links a { color: var(--accent); font-size: 13px; text-decoration: none; display: block; margin: 6px 0; }
+        .onboarding .error-msg { color: var(--accent); font-size: 13px; margin-top: 12px; text-align: center; display: none; }
+        .onboarding .success-msg { color: var(--success); font-size: 13px; margin-top: 12px; text-align: center; display: none; }
 
         /* Shared banner */
         .shared-banner {
@@ -127,6 +155,23 @@
         .empty { text-align: center; padding: 30px; color: var(--text-secondary); }
         .empty i { font-size: 36px; margin-bottom: 10px; opacity: 0.3; }
 
+        /* Article viewer */
+        .article-header {
+            background: var(--bg-secondary); padding: 12px 16px;
+            display: flex; align-items: center; gap: 12px;
+            border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+        }
+        .article-header .back-btn { background: none; border: none; color: var(--text-primary); font-size: 18px; cursor: pointer; padding: 4px; }
+        .article-header .article-title { flex: 1; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .article-header .pdf-btn { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .article-content { padding: 16px; font-size: 15px; line-height: 1.7; }
+        .article-content h1 { font-size: 20px; margin-bottom: 16px; line-height: 1.3; }
+        .article-content p { margin-bottom: 12px; }
+        .article-content a { color: var(--accent); }
+
+        /* PDF viewer */
+        .pdf-frame { width: 100%; height: calc(100vh - 60px); border: none; }
+
         /* Settings */
         .settings-group { margin-bottom: 20px; }
         .settings-group h3 { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
@@ -134,8 +179,6 @@
         .setting-item .label { font-size: 13px; font-weight: 500; }
         .setting-item .value { font-size: 12px; color: var(--text-secondary); }
         .setting-item .value.connected { color: var(--success); }
-
-        /* Form inputs in settings */
         .form-input {
             width: 100%; background: var(--bg-secondary); border: 1px solid var(--border);
             border-radius: 8px; padding: 10px 12px; color: var(--text-primary);
@@ -143,8 +186,6 @@
         }
         .form-input:focus { border-color: var(--accent); }
         .form-input::placeholder { color: #555; }
-
-        /* Cookie status */
         .cookie-status {
             display: flex; align-items: center; gap: 8px; padding: 10px 14px;
             background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);
@@ -154,6 +195,11 @@
         .cookie-status .dot.ok { background: var(--success); }
         .cookie-status .dot.expired { background: var(--warning); }
         .cookie-status .dot.none { background: var(--accent); }
+        .api-key-display {
+            background: var(--bg-secondary); border-radius: 8px; padding: 10px 12px;
+            font-family: monospace; font-size: 11px; word-break: break-all;
+            color: var(--text-secondary); margin-bottom: 8px; border: 1px solid var(--border);
+        }
 
         /* Toast */
         .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500; z-index: 2000; transition: transform .3s ease; display: flex; align-items: center; gap: 8px; max-width: 90%; }
@@ -166,104 +212,180 @@
         .nav-btn { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 14px; background: none; border: none; color: var(--text-secondary); font-size: 10px; cursor: pointer; }
         .nav-btn i { font-size: 18px; }
         .nav-btn.active { color: var(--accent); }
+
+        /* Floating PDF button */
+        .fab-pdf {
+            position: fixed; bottom: 90px; right: 20px;
+            width: 52px; height: 52px; border-radius: 50%;
+            background: var(--accent); color: white; border: none;
+            font-size: 20px; cursor: pointer; z-index: 99;
+            box-shadow: 0 4px 12px rgba(233,69,96,0.4);
+            display: none; align-items: center; justify-content: center;
+        }
+        .fab-pdf.visible { display: flex; }
     </style>
 </head>
 <body>
-<div class="container">
-    <!-- Header -->
-    <header class="header">
-        <h1><i class="fas fa-newspaper"></i> Presse Scraper</h1>
-    </header>
 
-    <!-- Home -->
-    <div class="screen active" id="homeScreen">
-        <!-- Shared content banner -->
-        <div class="shared-banner" id="sharedBanner">
-            <i class="fas fa-share-alt icon"></i>
-            <div class="text">
-                <div class="label" id="sharedLabel">Contenu partagé</div>
-                <div class="content" id="sharedContent"></div>
-            </div>
-            <button class="use-btn" id="useSharedBtn">Utiliser</button>
-        </div>
-
-        <div class="input-card">
-            <label>URL de l'article ou termes de recherche</label>
-            <div class="input-row">
-                <input type="text" id="urlInput" placeholder="Collez un lien ou tapez des mots-clés..." autocomplete="off" />
-                <button class="scrape-btn" id="scrapeBtn"><i class="fas fa-magic"></i> Scraper</button>
-            </div>
-        </div>
-
-        <div class="status-card" id="statusCard">
-            <div class="status-icon"><i class="fas fa-spinner" id="statusIcon"></i></div>
-            <div class="status-title" id="statusTitle">Initialisation...</div>
-            <div class="status-sub" id="statusSub"></div>
-            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-            <div class="action-row" id="actionRow" style="display:none;">
-                <button class="action-btn secondary" id="cancelBtn"><i class="fas fa-times"></i> Annuler</button>
-                <button class="action-btn primary" id="downloadBtn" style="display:none;"><i class="fas fa-download"></i> PDF</button>
-            </div>
-        </div>
-
-        <div class="section-title"><i class="fas fa-history"></i> Historique</div>
-        <div id="historyList"><div class="empty"><i class="fas fa-inbox"></i><p>Aucun article</p></div></div>
+<!-- ONBOARDING SCREEN -->
+<div id="onboardingScreen" class="onboarding" style="display:none;">
+    <i class="fas fa-newspaper logo" style="color:var(--accent)"></i>
+    <h2>Connexion à Europresse</h2>
+    <p class="subtitle">Entrez vos identifiants BnF pour accéder aux articles.<br>Vos credentials restent sur votre appareil.</p>
+    <div class="form-group">
+        <label>Identifiant BnF</label>
+        <input type="text" id="onboardUsername" placeholder="Votre identifiant..." autocomplete="off">
     </div>
+    <div class="form-group">
+        <label>Mot de passe BnF</label>
+        <input type="password" id="onboardPassword" placeholder="Votre mot de passe..." autocomplete="off">
+    </div>
+    <button class="btn-primary" id="onboardLoginBtn" onclick="onboardLogin()">
+        <i class="fas fa-key"></i> Se connecter
+    </button>
+    <div class="error-msg" id="onboardError"></div>
+    <div class="success-msg" id="onboardSuccess"></div>
+    <div class="links">
+        <a href="https://bnf.idm.oclc.org/login" target="_blank" onclick="openExternal(this.href); return false;">
+            <i class="fas fa-user-plus"></i> Créer un compte BnF
+        </a>
+        <a href="https://bnf.idm.oclc.org/forgot" target="_blank" onclick="openExternal(this.href); return false;">
+            <i class="fas fa-question-circle"></i> Identifiants oubliés ?
+        </a>
+    </div>
+</div>
 
-    <!-- Settings -->
-    <div class="screen" id="settingsScreen">
-        <div class="settings-group">
-            <h3>Serveur API</h3>
-            <div style="padding: 0 14px;">
-                <input type="text" id="apiUrlInput" value="http://141.145.223.71:5000" class="form-input" placeholder="http://IP:5000">
+<!-- MAIN APP -->
+<div id="mainApp" style="display:none;">
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1><i class="fas fa-newspaper"></i> Presse Scraper</h1>
+            <span class="session-dot none" id="sessionDot" title="Session BnF"></span>
+        </header>
+
+        <!-- HOME SCREEN -->
+        <div class="screen active" id="homeScreen">
+            <div class="shared-banner" id="sharedBanner">
+                <i class="fas fa-share-alt icon"></i>
+                <div class="text">
+                    <div class="label" id="sharedLabel">Contenu partagé</div>
+                    <div class="content" id="sharedContent"></div>
+                </div>
+                <button class="use-btn" id="useSharedBtn">Utiliser</button>
             </div>
+
+            <div class="input-card">
+                <label>URL de l'article ou termes de recherche</label>
+                <div class="input-row">
+                    <input type="text" id="urlInput" placeholder="Collez un lien ou tapez des mots-clés..." autocomplete="off">
+                    <button class="scrape-btn" id="scrapeBtn" onclick="startScraping()">
+                        <i class="fas fa-magic"></i> Scraper
+                    </button>
+                </div>
+            </div>
+
+            <div class="status-card" id="statusCard">
+                <div class="status-icon"><i class="fas fa-spinner" id="statusIcon"></i></div>
+                <div class="status-title" id="statusTitle">Initialisation...</div>
+                <div class="status-sub" id="statusSub"></div>
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="action-row" id="actionRow" style="display:none;">
+                    <button class="action-btn secondary" id="cancelBtn" onclick="cancelJob()"><i class="fas fa-times"></i> Annuler</button>
+                    <button class="action-btn primary" id="openArticleBtn" onclick="openArticle()" style="display:none;"><i class="fas fa-eye"></i> Ouvrir l'article</button>
+                </div>
+            </div>
+
+            <div class="section-title"><i class="fas fa-history"></i> Historique</div>
+            <div id="historyList"><div class="empty"><i class="fas fa-inbox"></i><p>Aucun article</p></div></div>
         </div>
 
-        <div class="settings-group">
-            <h3>Connexion BnF <small style="font-weight:normal;color:var(--text-secondary)">(Europresse)</small></h3>
-            <div style="padding: 0 14px;">
-                <input type="text" id="bnfUsername" class="form-input" placeholder="Identifiant BnF..." autocomplete="off">
-                <input type="password" id="bnfPassword" class="form-input" placeholder="Mot de passe BnF..." autocomplete="off">
-                <button class="action-btn primary" id="saveBnfBtn" style="width:100%;margin-top:4px;">
-                    <i class="fas fa-save"></i> Sauvegarder
+        <!-- HISTORY SCREEN -->
+        <div class="screen" id="historyScreen">
+            <div class="section-title"><i class="fas fa-history"></i> Historique des articles</div>
+            <div id="fullHistoryList"><div class="empty"><i class="fas fa-inbox"></i><p>Aucun article</p></div></div>
+        </div>
+
+        <!-- SETTINGS SCREEN -->
+        <div class="screen" id="settingsScreen">
+            <div class="settings-group">
+                <h3>Session BnF</h3>
+                <div class="cookie-status" id="cookieStatus">
+                    <div class="dot none" id="cookieDot"></div>
+                    <span id="cookieText">Non connecté</span>
+                </div>
+                <div id="bnfUserDisplay" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;padding:0 4px;"></div>
+                <button class="action-btn secondary" id="reconnectBnfBtn" style="width:100%;margin-bottom:6px;" onclick="reconnectBnf()">
+                    <i class="fas fa-key"></i> Se reconnecter
+                </button>
+                <button class="action-btn secondary" id="disconnectBnfBtn" style="width:100%;" onclick="disconnectBnf()">
+                    <i class="fas fa-sign-out-alt"></i> Se déconnecter
+                </button>
+            </div>
+
+            <div class="settings-group">
+                <h3>Clé API</h3>
+                <div class="api-key-display" id="apiKeyDisplay">Non générée</div>
+                <button class="action-btn secondary" onclick="regenerateApiKey()" style="width:100%;">
+                    <i class="fas fa-sync"></i> Régénérer la clé API
+                </button>
+            </div>
+
+            <div class="settings-group">
+                <h3>Stockage</h3>
+                <div class="setting-item">
+                    <div class="label">Articles en cache</div>
+                    <div class="value" id="cacheCount">0</div>
+                </div>
+                <button class="action-btn secondary" onclick="clearCache()" style="width:100%;margin-top:8px;">
+                    <i class="fas fa-trash"></i> Vider le cache
+                </button>
+            </div>
+
+            <div class="settings-group">
+                <h3>Serveur</h3>
+                <input type="text" id="apiUrlInput" class="form-input" placeholder="http://IP:5000">
+                <button class="action-btn secondary" onclick="testConnection()" style="width:100%;">
+                    <i class="fas fa-wifi"></i> Tester la connexion
                 </button>
             </div>
         </div>
 
-        <div class="settings-group">
-            <h3>Session BnF</h3>
-            <div class="cookie-status" id="cookieStatus">
-                <div class="dot none" id="cookieDot"></div>
-                <span id="cookieText">Non connecté</span>
+        <!-- ARTICLE VIEWER SCREEN -->
+        <div class="screen" id="articleScreen">
+            <div class="article-header">
+                <button class="back-btn" onclick="closeArticle()"><i class="fas fa-arrow-left"></i></button>
+                <span class="article-title" id="viewerArticleTitle"></span>
+                <button class="pdf-btn" onclick="openPdf()"><i class="fas fa-file-pdf"></i> PDF</button>
             </div>
-            <button class="action-btn secondary" id="loginBnfBtn" style="width:100%;margin-top:8px;">
-                <i class="fas fa-key"></i> Se connecter à Europresse
-            </button>
-            <button class="action-btn secondary" id="clearBnfBtn" style="width:100%;margin-top:8px;">
-                <i class="fas fa-trash"></i> Supprimer les données BnF
-            </button>
+            <div class="article-content" id="articleContent"></div>
         </div>
 
-        <div class="settings-group">
-            <h3>Stockage</h3>
-            <div class="setting-item">
-                <div class="label">Articles en cache</div>
-                <div class="value" id="cacheCount">0</div>
+        <!-- PDF VIEWER SCREEN -->
+        <div class="screen" id="pdfScreen">
+            <div class="article-header">
+                <button class="back-btn" onclick="closePdf()"><i class="fas fa-arrow-left"></i></button>
+                <span class="article-title">PDF</span>
             </div>
-            <button class="action-btn secondary" id="clearCacheBtn" style="width:100%; margin-top:8px;">
-                <i class="fas fa-trash"></i> Vider le cache
-            </button>
+            <iframe class="pdf-frame" id="pdfFrame"></iframe>
         </div>
+
+        <!-- Toast -->
+        <div class="toast" id="toast"><i class="fas fa-info-circle"></i><span id="toastText"></span></div>
+
+        <!-- Bottom nav -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-screen="homeScreen" onclick="switchScreen('homeScreen')">
+                <i class="fas fa-home"></i><span>Accueil</span>
+            </button>
+            <button class="nav-btn" data-screen="historyScreen" onclick="switchScreen('historyScreen')">
+                <i class="fas fa-history"></i><span>Historique</span>
+            </button>
+            <button class="nav-btn" data-screen="settingsScreen" onclick="switchScreen('settingsScreen')">
+                <i class="fas fa-cog"></i><span>Paramètres</span>
+            </button>
+        </nav>
     </div>
-
-    <!-- Toast -->
-    <div class="toast" id="toast"><i class="fas fa-info-circle"></i><span id="toastText"></span></div>
-
-    <!-- Bottom nav -->
-    <nav class="bottom-nav">
-        <button class="nav-btn active" data-screen="homeScreen"><i class="fas fa-home"></i><span>Accueil</span></button>
-        <button class="nav-btn" data-screen="settingsScreen"><i class="fas fa-cog"></i><span>Paramètres</span></button>
-    </nav>
 </div>
 
 <script>
@@ -271,22 +393,22 @@
     'use strict';
 
     // ===== CONFIG =====
-    const STORAGE_KEY = 'presse_scraper_v3';
+    const STORAGE_KEY = 'presse_scraper_v2';
     const BNF_AUTH_URL = 'https://bnf.idm.oclc.org/login?url=https://nouveau.europresse.com/access/ip/default.aspx?un=D000067U_1';
-    const BNF_DOMAIN = 'nouveau-europresse-com.bnf.idm.oclc.org';
 
     // ===== STATE =====
     let state = {
         apiUrl: 'http://141.145.223.71:5000',
         bnfUsername: '',
         bnfPassword: '',
-        bnfCookies: null,       // [{name, value, domain, path, expires, ...}]
-    bnfCookiesExpiry: null,  // timestamp ms
+        bnfCookies: null,
+        bnfCookiesExpiry: null,
+        apiKey: null,
         history: [],
         currentJobId: null,
+        currentArticleId: null,
         pollInterval: null,
-        sharedText: null,
-        sharedUrl: null
+        sharedText: null
     };
 
     // ===== STORAGE =====
@@ -303,182 +425,222 @@
             bnfPassword: state.bnfPassword,
             bnfCookies: state.bnfCookies,
             bnfCookiesExpiry: state.bnfCookiesExpiry,
+            apiKey: state.apiKey,
             history: state.history
         }));
     }
 
-    // ===== DOM =====
-    const $ = id => document.getElementById(id);
+    // ===== INIT =====
+    load();
 
-    // ===== TOAST =====
-    let toastTimer = null;
-    function toast(msg, type='') {
-        const el = $('toast');
-        $('toastText').textContent = msg;
-        el.className = 'toast ' + type + ' show';
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
+    // Check if BnF credentials exist
+    if (!state.bnfUsername || !state.bnfPassword || !state.bnfCookies) {
+        showOnboarding();
+    } else {
+        showMainApp();
     }
 
-    // ===== NAV =====
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
-            $(btn.dataset.screen).classList.add('active');
-            btn.classList.add('active');
-        });
-    });
+    // Register device if no API key
+    if (!state.apiKey) {
+        registerDevice();
+    }
 
-    // ===== API =====
-    function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
+    // ===== SCREEN MANAGEMENT =====
+    function showOnboarding() {
+        document.getElementById('onboardingScreen').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+    }
 
-    async function apiCall(path, opts={}) {
-        const url = apiUrl(path);
-        const headers = { 'Content-Type': 'application/json', ...opts.headers };
+    function showMainApp() {
+        document.getElementById('onboardingScreen').style.display = 'none';
+        document.getElementById('mainApp').style.display = 'block';
+        updateCookieStatusUI();
+        renderHistory();
+        loadServerHistory();
+    }
 
-        // Use native BnfLogin.httpRequest plugin (bypasses WebView restrictions)
-        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.BnfLogin) {
-            const { BnfLogin } = window.Capacitor.Plugins;
-            const result = await BnfLogin.httpRequest({
-                url: url,
-                method: opts.method || 'GET',
-                headers: headers,
-                body: opts.body ? JSON.parse(opts.body) : null
-            });
-            if (result.error) {
-                throw new Error(result.error);
-            }
-            if (result.status >= 400) {
-                try {
-                    const errData = JSON.parse(result.data);
-                    throw new Error(errData.message || errData.error || 'HTTP ' + result.status);
-                } catch(e) {
-                    throw new Error('HTTP ' + result.status);
-                }
-            }
-            try {
-                return JSON.parse(result.data);
-            } catch(e) {
-                return result.data;
-            }
+    function switchScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        document.querySelector(`.nav-btn[data-screen="${screenId}"]`)?.classList.add('active');
+
+        if (screenId === 'historyScreen') renderFullHistory();
+        if (screenId === 'settingsScreen') updateSettingsUI();
+    }
+
+    // ===== ONBOARDING =====
+    window.onboardLogin = async function() {
+        const username = document.getElementById('onboardUsername').value.trim();
+        const password = document.getElementById('onboardPassword').value;
+        const errorEl = document.getElementById('onboardError');
+        const successEl = document.getElementById('onboardSuccess');
+        const btn = document.getElementById('onboardLoginBtn');
+
+        if (!username || !password) {
+            errorEl.textContent = 'Entrez vos identifiants BnF';
+            errorEl.style.display = 'block';
+            return;
         }
 
-        // Fallback to fetch (PWA / browser)
-        const r = await fetch(url, { ...opts, headers });
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion...';
+        errorEl.style.display = 'none';
+        successEl.style.display = 'none';
+
+        try {
+            const result = await nativeLogin(username, password);
+            if (result.success && result.cookies) {
+                state.bnfUsername = username;
+                state.bnfPassword = password;
+                state.bnfCookies = result.cookies;
+                state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
+                save();
+
+                successEl.textContent = 'Connexion réussie !';
+                successEl.style.display = 'block';
+
+                setTimeout(() => {
+                    showMainApp();
+                }, 1000);
+            } else {
+                errorEl.textContent = result.error || 'Échec de connexion';
+                errorEl.style.display = 'block';
+            }
+        } catch(e) {
+            errorEl.textContent = 'Erreur: ' + e.message;
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-key"></i> Se connecter';
+        }
+    };
+
+    // ===== NATIVE LOGIN =====
+    async function nativeLogin(username, password) {
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BnfLogin) {
+            const { BnfLogin } = window.Capacitor.Plugins;
+            return await BnfLogin.login({ username, password });
+        }
+        // Fallback for browser testing
+        return { success: false, error: 'Plugin BnfLogin non disponible (mode navigateur)' };
+    }
+
+    async function nativeHttpRequest(opts) {
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BnfLogin) {
+            const { BnfLogin } = window.Capacitor.Plugins;
+            const result = await BnfLogin.httpRequest(opts);
+            if (result.error) throw new Error(result.error);
+            if (result.status >= 400) throw new Error('HTTP ' + result.status);
+            try { return JSON.parse(result.data); } catch(e) { return result.data; }
+        }
+        const r = await fetch(opts.url, {
+            method: opts.method || 'GET',
+            headers: opts.headers,
+            body: opts.body
+        });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message || d.error || 'HTTP ' + r.status);
         return d;
     }
 
+    // ===== API =====
+    function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
+
+    async function apiCall(path, opts = {}) {
+        const headers = { 'Content-Type': 'application/json', ...opts.headers };
+        if (state.apiKey) headers['X-API-Key'] = state.apiKey;
+
+        return await nativeHttpRequest({
+            url: apiUrl(path),
+            method: opts.method || 'GET',
+            headers: headers,
+            body: opts.body ? JSON.stringify(opts.body) : null
+        });
+    }
+
+    // ===== REGISTER DEVICE =====
+    async function registerDevice() {
+        try {
+            const deviceId = getDeviceId();
+            const result = await apiCall('/register', {
+                method: 'POST',
+                body: { device_id: deviceId }
+            });
+            if (result.api_key) {
+                state.apiKey = result.api_key;
+                save();
+            }
+        } catch(e) {
+            console.error('Register failed:', e);
+        }
+    }
+
+    function getDeviceId() {
+        let id = localStorage.getItem('device_id');
+        if (!id) {
+            id = 'dev_' + Math.random().toString(36).substring(2, 10);
+            localStorage.setItem('device_id', id);
+        }
+        return id;
+    }
+
     // ===== COOKIE HELPERS =====
     function areCookiesValid() {
-        if (!state.bnfCookies || !state.bnfCookies.length) return false;
+        if (!state.bnfCookies?.length) return false;
         if (!state.bnfCookiesExpiry) return false;
-        // Check if expired (with 5 min buffer)
         return Date.now() < (state.bnfCookiesExpiry - 300000);
     }
 
     function updateCookieStatusUI() {
-        const dot = $('cookieDot');
-        const text = $('cookieText');
+        const dot = document.getElementById('cookieDot');
+        const text = document.getElementById('cookieText');
+        const userDisplay = document.getElementById('bnfUserDisplay');
+
         if (areCookiesValid()) {
-            const exp = new Date(state.bnfCookiesExpiry);
             dot.className = 'dot ok';
-            text.textContent = `Connecté (expire ${exp.toLocaleDateString('fr-FR')} ${exp.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})})`;
-        } else if (state.bnfCookies && state.bnfCookies.length) {
+            const exp = new Date(state.bnfCookiesExpiry);
+            text.textContent = `Session valide (expire ${exp.toLocaleDateString('fr-FR')} ${exp.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})})`;
+        } else if (state.bnfCookies?.length) {
             dot.className = 'dot expired';
-            text.textContent = 'Session expirée — reconnectez-vous';
+            text.textContent = 'Session expirée';
         } else {
             dot.className = 'dot none';
             text.textContent = 'Non connecté';
         }
-    }
 
-    // ===== BnF LOGIN via native plugin =====
-    async function loginBnF() {
-        if (!state.bnfUsername || !state.bnfPassword) {
-            toast('Entrez vos credentials BnF dans les paramètres', 'error');
-            return false;
+        if (state.bnfUsername) {
+            userDisplay.textContent = `Connecté en tant que : ${state.bnfUsername}`;
+        } else {
+            userDisplay.textContent = '';
         }
 
-        // Check if Capacitor + BnfLogin plugin is available
-        if (typeof window.Capacitor === 'undefined' || !window.Capacitor.Plugins || !window.Capacitor.Plugins.BnfLogin) {
-            toast('Plugin BnfLogin non disponible — rebuild needed', 'error');
-            return false;
-        }
-
-        try {
-            const { BnfLogin } = window.Capacitor.Plugins;
-            const result = await BnfLogin.login({
-                username: state.bnfUsername,
-                password: state.bnfPassword
-            });
-
-            if (result.success && result.cookies) {
-                state.bnfCookies = result.cookies;
-                // Set expiry to 8 hours from now (typical BnF session)
-                state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
-                save();
-                updateCookieStatusUI();
-                return true;
-            } else {
-                toast(result.error || 'Échec connexion BnF', 'error');
-                return false;
-            }
-        } catch(e) {
-            console.error('loginBnF error:', e);
-            toast('Erreur: ' + e.message, 'error');
-            return false;
-        }
+        // Update header dot
+        const headerDot = document.getElementById('sessionDot');
+        if (headerDot) headerDot.className = dot.className;
     }
 
-    // ===== ENSURE COOKIES (login if needed) =====
-    async function ensureCookies() {
-        if (areCookiesValid()) return true;
-        toast('Connexion à Europresse...', '');
-        return await loginBnF();
-    }
-
-    // ===== SHARED CONTENT =====
-    function showSharedBanner(text, isUrl) {
-        state.sharedText = text;
-        state.sharedUrl = isUrl ? text : null;
-        const banner = $('sharedBanner');
-        const label = $('sharedLabel');
-        const content = $('sharedContent');
-        banner.classList.add('visible');
-        label.textContent = isUrl ? 'Lien partagé' : 'Texte partagé';
-        content.textContent = text.length > 60 ? text.substring(0, 60) + '...' : text;
-    }
-
-    $('useSharedBtn').addEventListener('click', () => {
-        if (state.sharedUrl) {
-            $('urlInput').value = state.sharedUrl;
-        } else if (state.sharedText) {
-            $('urlInput').value = state.sharedText;
-        }
-        $('sharedBanner').classList.remove('visible');
-        $('urlInput').focus();
-    });
-
-    // ===== SCRAPE =====
-    async function startScraping() {
-        const input = $('urlInput').value.trim();
+    // ===== SCRAPING =====
+    window.startScraping = async function() {
+        const input = document.getElementById('urlInput').value.trim();
         if (!input) { toast('Entrez une URL ou des termes', 'error'); return; }
 
         const isUrl = input.match(/^https?:\/\//);
         const payload = { url: isUrl ? input : '', search_terms: isUrl ? '' : input };
 
-        // Ensure we have valid BnF cookies
-        const btn = $('scrapeBtn');
-        const card = $('statusCard');
-        const icon = $('statusIcon');
-        const title = $('statusTitle');
-        const sub = $('statusSub');
-        const fill = $('progressFill');
-        const actions = $('actionRow');
-        const dlBtn = $('downloadBtn');
+        // Add cookies if available
+        if (state.bnfCookies?.length) {
+            payload.cookies = state.bnfCookies;
+        }
+
+        const btn = document.getElementById('scrapeBtn');
+        const card = document.getElementById('statusCard');
+        const icon = document.getElementById('statusIcon');
+        const title = document.getElementById('statusTitle');
+        const sub = document.getElementById('statusSub');
+        const fill = document.getElementById('progressFill');
+        const actions = document.getElementById('actionRow');
+        const openBtn = document.getElementById('openArticleBtn');
 
         btn.disabled = true; btn.classList.add('loading');
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>...';
@@ -486,307 +648,396 @@
         icon.className = 'fas fa-spinner fa-spin';
         title.textContent = 'Vérification session BnF...';
         sub.textContent = ''; fill.style.width = '5%';
-        actions.style.display = 'none'; dlBtn.style.display = 'none';
+        actions.style.display = 'none'; openBtn.style.display = 'none';
 
         try {
-            // Step 1: Ensure cookies
-            const hasCookies = await ensureCookies();
-            if (!hasCookies) {
-                throw new Error('Impossible de se connecter à Europresse');
+            // Check cookies
+            if (!areCookiesValid() && state.bnfUsername && state.bnfPassword) {
+                title.textContent = 'Reconnexion à Europresse...';
+                try {
+                    const result = await nativeLogin(state.bnfUsername, state.bnfPassword);
+                    if (result.success && result.cookies) {
+                        state.bnfCookies = result.cookies;
+                        state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
+                        save();
+                        payload.cookies = state.cookies;
+                    }
+                } catch(e) {}
             }
 
+            updateCookieStatusUI();
             fill.style.width = '15%';
             title.textContent = 'Envoi au serveur...';
 
-            // Step 2: Add cookies to payload
-            payload.cookies = state.bnfCookies;
+            const result = await apiCall('/scrape', {
+                method: 'POST',
+                body: payload
+            });
 
-            // Step 3: Send scrape request
-            const d = await apiCall('/scrape', { method: 'POST', body: JSON.stringify(payload) });
-
-            if (d.cached) {
+            if (result.status === 'completed' && result.article_id) {
+                // Cache hit
+                fill.style.width = '100%';
+                title.textContent = '✅ Article trouvé en cache !';
+                sub.textContent = '';
                 card.className = 'status-card visible success';
                 icon.className = 'fas fa-check-circle';
-                title.textContent = 'Article en cache !';
-                sub.textContent = d.article_id;
-                fill.style.width = '100%';
-                dlBtn.style.display = 'flex';
-                dlBtn.dataset.id = d.article_id;
-                addHistory(d.article_id, input, 'completed');
-            } else {
-                state.currentJobId = d.job_id;
-                title.textContent = 'Job créé';
-                sub.textContent = d.job_id;
-                fill.style.width = '20%';
+                state.currentArticleId = result.article_id;
                 actions.style.display = 'flex';
-                pollJob(d.job_id, input);
+                openBtn.style.display = 'inline-flex';
+            } else if (result.job_id) {
+                state.currentJobId = result.job_id;
+                state.currentArticleId = null;
+                fill.style.width = '25%';
+                title.textContent = 'Traitement en cours...';
+                actions.style.display = 'flex';
+                pollJob(result.job_id);
+            } else {
+                throw new Error(result.message || 'Erreur inconnue');
             }
         } catch(e) {
             card.className = 'status-card visible error';
-            icon.className = 'fas fa-exclamation-circle';
+            icon.className = 'fas fa-exclamation-triangle';
             title.textContent = 'Erreur';
             sub.textContent = e.message;
-            fill.style.width = '0%';
-            toast(e.message, 'error');
-
-            // If auth error, clear cookies so next attempt re-logins
-            if (e.message.includes('401') || e.message.includes('cookie') || e.message.includes('session') || e.message.includes('Europresse')) {
-                state.bnfCookies = null;
-                state.bnfCookiesExpiry = null;
-                save();
-                updateCookieStatusUI();
-            }
-        } finally {
             btn.disabled = false; btn.classList.remove('loading');
             btn.innerHTML = '<i class="fas fa-magic"></i> Scraper';
         }
-    }
+    };
 
-    async function pollJob(jobId, input) {
-        const card = $('statusCard');
-        const icon = $('statusIcon');
-        const title = $('statusTitle');
-        const sub = $('statusSub');
-        const fill = $('progressFill');
-        const actions = $('actionRow');
-        const dlBtn = $('downloadBtn');
-
+    function pollJob(jobId) {
         if (state.pollInterval) clearInterval(state.pollInterval);
+
+        const card = document.getElementById('statusCard');
+        const icon = document.getElementById('statusIcon');
+        const title = document.getElementById('statusTitle');
+        const sub = document.getElementById('statusSub');
+        const fill = document.getElementById('progressFill');
+        const openBtn = document.getElementById('openArticleBtn');
+
+        let progress = 25;
+
         state.pollInterval = setInterval(async () => {
             try {
-                const d = await apiCall('/job/' + jobId);
-                switch(d.status) {
-                    case 'pending':
-                        title.textContent = 'En attente...';
-                        fill.style.width = '25%'; break;
-                    case 'processing':
-                        title.textContent = d.step_description || 'Traitement...';
-                        sub.textContent = d.search_terms || '';
-                        fill.style.width = '50%'; break;
-                    case 'completed':
-                        clearInterval(state.pollInterval);
-                        card.className = 'status-card visible success';
-                        icon.className = 'fas fa-check-circle';
-                        title.textContent = 'Article scrapé !';
-                        sub.textContent = d.article_id;
-                        fill.style.width = '100%';
-                        actions.style.display = 'none';
-                        dlBtn.style.display = 'flex';
-                        dlBtn.dataset.id = d.article_id;
-                        addHistory(d.article_id, input, 'completed');
-                        toast('Article prêt !', 'success');
-                        break;
-                    case 'failed':
-                        clearInterval(state.pollInterval);
-                        card.className = 'status-card visible error';
-                        icon.className = 'fas fa-exclamation-circle';
-                        title.textContent = 'Échec';
-                        sub.textContent = d.error_message || '';
-                        fill.style.width = '0%';
-                        actions.style.display = 'none';
-                        addHistory(jobId, input, 'failed');
-                        toast(d.error_message || 'Échec', 'error');
-                        break;
-                    case 'cancelled':
-                        clearInterval(state.pollInterval);
-                        card.className = 'status-card visible error';
-                        icon.className = 'fas fa-ban';
-                        title.textContent = 'Annulé';
-                        actions.style.display = 'none';
-                        break;
+                const job = await apiCall('/job/' + jobId);
+                progress = Math.min(progress + 10, 90);
+                fill.style.width = progress + '%';
+
+                const stepMap = {
+                    'pending': 'En attente...',
+                    'processing': job.step_description || 'Traitement...',
+                    'completed': '✅ Terminé !',
+                    'failed': '❌ Échec'
+                };
+                title.textContent = stepMap[job.status] || job.status;
+                if (job.article_title) sub.textContent = job.article_title;
+
+                if (job.status === 'completed') {
+                    clearInterval(state.pollInterval);
+                    state.pollInterval = null;
+                    fill.style.width = '100%';
+                    card.className = 'status-card visible success';
+                    icon.className = 'fas fa-check-circle';
+                    state.currentArticleId = job.article_id;
+
+                    // Add to history
+                    addToHistory({
+                        id: job.article_id,
+                        title: job.article_title || 'Article',
+                        url: job.url,
+                        source: job.source_site || '',
+                        date: new Date().toISOString(),
+                        status: 'completed'
+                    });
+
+                    openBtn.style.display = 'inline-flex';
+                    resetScrapeBtn();
+                } else if (job.status === 'failed') {
+                    clearInterval(state.pollInterval);
+                    state.pollInterval = null;
+                    card.className = 'status-card visible error';
+                    icon.className = 'fas fa-exclamation-triangle';
+                    title.textContent = 'Échec';
+                    sub.textContent = job.error_message || 'Erreur inconnue';
+                    resetScrapeBtn();
                 }
-            } catch(e) { console.error('poll:', e); }
-        }, 2000);
+            } catch(e) {
+                console.error('Poll error:', e);
+            }
+        }, 3000);
     }
 
-    async function downloadPdf(id) {
-        try {
-            const url = apiUrl('/article/' + id + '/pdf');
-            const r = await BnfLogin.downloadFile({ url, filename: id + '.pdf' });
-            if (r.error) throw new Error(r.error);
-            toast('PDF sauvegardé: ' + r.path, 'success');
-        } catch(e) {
-            // Fallback: essayer via fetch
-            try {
-                const r = await fetch(url);
-                if (!r.ok) throw new Error('Erreur téléchargement');
-                const blob = await r.blob();
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob);
-                a.download = id + '.pdf';
-                a.click();
-                URL.revokeObjectURL(a.href);
-                toast('PDF téléchargé', 'success');
-            } catch(e2) {
-                toast('Erreur: ' + e.message, 'error');
-            }
+    window.cancelJob = async function() {
+        if (state.currentJobId) {
+            try { await apiCall('/job/' + state.currentJobId + '/cancel', { method: 'POST' }); } catch(e) {}
         }
+        if (state.pollInterval) clearInterval(state.pollInterval);
+        state.pollInterval = null;
+        resetScrapeBtn();
+        document.getElementById('statusCard').classList.remove('visible');
+    };
+
+    function resetScrapeBtn() {
+        const btn = document.getElementById('scrapeBtn');
+        btn.disabled = false; btn.classList.remove('loading');
+        btn.innerHTML = '<i class="fas fa-magic"></i> Scraper';
     }
+
+    // ===== ARTICLE VIEWER =====
+    window.openArticle = async function() {
+        if (!state.currentArticleId) return;
+
+        try {
+            const article = await apiCall('/article/' + state.currentArticleId);
+            switchScreen('articleScreen');
+            document.getElementById('viewerArticleTitle').textContent = article.title || 'Article';
+            document.getElementById('articleContent').innerHTML = article.html_content || '<p>Contenu indisponible</p>';
+        } catch(e) {
+            toast('Erreur: ' + e.message, 'error');
+        }
+    };
+
+    window.closeArticle = function() {
+        switchScreen('homeScreen');
+    };
+
+    window.openPdf = function() {
+        if (!state.currentArticleId) return;
+        const pdfUrl = apiUrl('/article/' + state.currentArticleId + '/pdf');
+        // Add auth header via cookie or token
+        document.getElementById('pdfFrame').src = pdfUrl;
+        switchScreen('pdfScreen');
+    };
+
+    window.closePdf = function() {
+        document.getElementById('pdfFrame').src = '';
+        switchScreen('articleScreen');
+    };
+
+    // Open article from history
+    window.viewArticle = async function(articleId) {
+        state.currentArticleId = articleId;
+        await openArticle();
+    };
 
     // ===== HISTORY =====
-    function addHistory(id, input, status) {
-        const ex = state.history.find(h => h.id === id);
-        if (ex) { ex.status = status; ex.date = new Date().toISOString(); }
-        else state.history.unshift({ id, input: input.substring(0, 80), status, date: new Date().toISOString() });
-        state.history = state.history.slice(0, 50);
+    function addToHistory(entry) {
+        // Avoid duplicates
+        const existing = state.history.findIndex(h => h.id === entry.id);
+        if (existing >= 0) state.history.splice(existing, 1);
+        state.history.unshift(entry);
+        // Keep max 100
+        if (state.history.length > 100) state.history = state.history.slice(0, 100);
         save();
         renderHistory();
     }
 
     function renderHistory() {
-        const list = $('historyList');
+        const list = document.getElementById('historyList');
+        const recent = state.history.slice(0, 5);
+
+        if (!recent.length) {
+            list.innerHTML = '<div class="empty"><i class="fas fa-inbox"></i><p>Aucun article</p></div>';
+            return;
+        }
+
+        list.innerHTML = recent.map(item => `
+            <div class="history-item" onclick="viewArticle('${item.id}')">
+                <div class="icon ${item.status === 'completed' ? 'pdf' : 'pending'}">
+                    <i class="fas fa-${item.status === 'completed' ? 'file-pdf' : 'clock'}"></i>
+                </div>
+                <div class="info">
+                    <div class="title">${escapeHtml(item.title)}</div>
+                    <div class="meta">${item.source || ''} · ${formatDate(item.date)}</div>
+                </div>
+                <span class="badge ${item.status === 'completed' ? 'done' : 'fail'}">
+                    ${item.status === 'completed' ? 'OK' : 'Erreur'}
+                </span>
+            </div>
+        `).join('');
+    }
+
+    function renderFullHistory() {
+        const list = document.getElementById('fullHistoryList');
+
         if (!state.history.length) {
             list.innerHTML = '<div class="empty"><i class="fas fa-inbox"></i><p>Aucun article</p></div>';
             return;
         }
-        list.innerHTML = state.history.map(h => {
-            const sc = h.status === 'completed' ? 'done' : 'fail';
-            const ic = h.status === 'completed' ? 'fa-file-pdf' : 'fa-exclamation-triangle';
-            const dt = new Date(h.date).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-            return `<div class="history-item" data-id="${h.id}" data-status="${h.status}">
-                <div class="icon ${sc}"><i class="fas ${ic}"></i></div>
-                <div class="info"><div class="title">${esc(h.input)}</div><div class="meta">${dt}</div></div>
-                <span class="badge ${sc}">${sc === 'done' ? 'Prêt' : 'Échec'}</span>
-            </div>`;
-        }).join('');
-        list.querySelectorAll('.history-item').forEach(el => {
-            el.addEventListener('click', () => { if (el.dataset.status === 'completed') downloadPdf(el.dataset.id); });
-        });
+
+        list.innerHTML = state.history.map(item => `
+            <div class="history-item" onclick="viewArticle('${item.id}')">
+                <div class="icon ${item.status === 'completed' ? 'pdf' : 'pending'}">
+                    <i class="fas fa-${item.status === 'completed' ? 'file-pdf' : 'clock'}"></i>
+                </div>
+                <div class="info">
+                    <div class="title">${escapeHtml(item.title)}</div>
+                    <div class="meta">${item.source || ''} · ${formatDate(item.date)}</div>
+                </div>
+                <span class="badge ${item.status === 'completed' ? 'done' : 'fail'}">
+                    ${item.status === 'completed' ? 'OK' : 'Erreur'}
+                </span>
+            </div>
+        `).join('');
     }
 
-    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-
-    // ===== CANCEL =====
-    async function cancelJob() {
-        if (!state.currentJobId) return;
+    async function loadServerHistory() {
         try {
-            await apiCall('/job/' + state.currentJobId + '/cancel', { method: 'POST' });
-            if (state.pollInterval) clearInterval(state.pollInterval);
-            $('statusCard').classList.remove('visible');
-            toast('Job annulé');
-        } catch(e) { toast(e.message, 'error'); }
+            const result = await apiCall('/articles?limit=20');
+            if (result.articles) {
+                // Merge server history with local
+                result.articles.forEach(a => {
+                    if (!state.history.find(h => h.id === a.id)) {
+                        state.history.push({
+                            id: a.id,
+                            title: a.title || 'Article',
+                            url: a.url,
+                            source: a.site_source || '',
+                            date: a.created_at,
+                            status: a.status || 'completed'
+                        });
+                    }
+                });
+                save();
+                renderHistory();
+            }
+        } catch(e) {
+            console.error('Load server history failed:', e);
+        }
     }
 
     // ===== SETTINGS =====
-    $('apiUrlInput').addEventListener('change', e => { state.apiUrl = e.target.value.replace(/\/+$/, ''); save(); });
-
-    $('saveBnfBtn').addEventListener('click', () => {
-        state.bnfUsername = $('bnfUsername').value.trim();
-        state.bnfPassword = $('bnfPassword').value.trim();
-        if (!state.bnfUsername || !state.bnfPassword) {
-            toast('Entrez identifiant et mot de passe', 'error');
-            return;
-        }
-        save();
-        toast('Credentials BnF sauvegardés', 'success');
-        // Clear existing cookies so next scrape triggers a fresh login
-        state.bnfCookies = null;
-        state.bnfCookiesExpiry = null;
-        save();
+    function updateSettingsUI() {
         updateCookieStatusUI();
-    });
-
-    $('loginBnfBtn').addEventListener('click', async () => {
-        if (!state.bnfUsername || !state.bnfPassword) {
-            toast('Entrez vos credentials BnF d\'abord', 'error');
-            return;
-        }
-        $('loginBnfBtn').disabled = true;
-        $('loginBnfBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion...';
-        try {
-            await loginBnF();
-        } finally {
-            $('loginBnfBtn').disabled = false;
-            $('loginBnfBtn').innerHTML = '<i class="fas fa-key"></i> Se connecter à Europresse';
-        }
-    });
-
-    $('clearBnfBtn').addEventListener('click', () => {
-        state.bnfUsername = '';
-        state.bnfPassword = '';
-        state.bnfCookies = null;
-        state.bnfCookiesExpiry = null;
-        save();
-        $('bnfUsername').value = '';
-        $('bnfPassword').value = '';
-        updateCookieStatusUI();
-        toast('Données BnF supprimées', 'success');
-    });
-
-    $('clearCacheBtn').addEventListener('click', () => {
-        state.history = []; save(); renderHistory();
-        $('cacheCount').textContent = '0';
-        toast('Cache vidé', 'success');
-    });
-
-    // ===== SCRAPE BUTTON =====
-    $('scrapeBtn').addEventListener('click', startScraping);
-    $('cancelBtn').addEventListener('click', cancelJob);
-    $('downloadBtn').addEventListener('click', () => downloadPdf($('downloadBtn').dataset.id));
-
-    // ===== CAPACITOR INTEGRATION =====
-    function initCapacitor() {
-        if (typeof window.Capacitor === 'undefined') {
-            console.log('Running as PWA (no Capacitor)');
-            return;
-        }
-
-        const { App } = window.Capacitor.Plugins;
-
-        // Listen for shared content
-        window.addEventListener('sharedText', (e) => {
-            const text = e.detail;
-            const isUrl = text.match(/^https?:\/\//);
-            showSharedBanner(text, isUrl);
-        });
-
-        window.addEventListener('sharedUrl', (e) => {
-            showSharedBanner(e.detail, true);
-        });
-
-        // Check pending intent on resume
-        App.addListener('appStateChange', ({ isActive }) => {
-            if (isActive) checkPendingIntent();
-        });
+        document.getElementById('apiKeyDisplay').textContent = state.apiKey || 'Non générée';
+        document.getElementById('apiUrlInput').value = state.apiUrl;
+        document.getElementById('cacheCount').textContent = state.history.length;
     }
 
-    async function checkPendingIntent() {
+    window.reconnectBnf = async function() {
+        if (!state.bnfUsername || !state.bnfPassword) {
+            showOnboarding();
+            return;
+        }
         try {
-            if (typeof window.Capacitor === 'undefined') return;
-            const { Preferences } = window.Capacitor.Plugins;
-            const url = await Preferences.get({ key: 'shared_url' });
-            const text = await Preferences.get({ key: 'shared_text' });
-            if (url.value) {
-                showSharedBanner(url.value, true);
-                await Preferences.remove({ key: 'shared_url' });
-            } else if (text.value) {
-                const isUrl = text.value.match(/^https?:\/\//);
-                showSharedBanner(text.value, isUrl);
-                await Preferences.remove({ key: 'shared_text' });
-                await Preferences.remove({ key: 'shared_title' });
+            const result = await nativeLogin(state.bnfUsername, state.bnfPassword);
+            if (result.success && result.cookies) {
+                state.bnfCookies = result.cookies;
+                state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
+                save();
+                updateCookieStatusUI();
+                toast('Session BnF renouvelée', 'success');
+            } else {
+                toast(result.error || 'Échec', 'error');
             }
-        } catch(e) { console.error('checkPendingIntent:', e); }
+        } catch(e) {
+            toast('Erreur: ' + e.message, 'error');
+        }
+    };
+
+    window.disconnectBnf = function() {
+        state.bnfCookies = null;
+        state.bnfCookiesExpiry = null;
+        save();
+        updateCookieStatusUI();
+        toast('Session BnF supprimée', '');
+    };
+
+    window.regenerateApiKey = async function() {
+        try {
+            await registerDevice();
+            updateSettingsUI();
+            toast('Nouvelle clé API générée', 'success');
+        } catch(e) {
+            toast('Erreur: ' + e.message, 'error');
+        }
+    };
+
+    window.clearCache = function() {
+        state.history = [];
+        save();
+        renderHistory();
+        updateSettingsUI();
+        toast('Cache vidé', '');
+    };
+
+    window.testConnection = async function() {
+        state.apiUrl = document.getElementById('apiUrlInput').value.trim();
+        save();
+        try {
+            await apiCall('/articles?limit=1');
+            toast('Connexion OK', 'success');
+        } catch(e) {
+            toast('Échec connexion: ' + e.message, 'error');
+        }
+    };
+
+    // ===== SHARED CONTENT =====
+    window.handleSharedContent = function(text) {
+        state.sharedText = text;
+        const isUrl = text.match(/^https?:\/\//);
+        const banner = document.getElementById('sharedBanner');
+        document.getElementById('sharedLabel').textContent = isUrl ? 'Lien partagé' : 'Texte partagé';
+        document.getElementById('sharedContent').textContent = text.length ? text.substring(0, 60) + (text.length > 60 ? '...' : '') : '';
+        banner.classList.add('visible');
+    };
+
+    document.getElementById('useSharedBtn').addEventListener('click', () => {
+        if (state.sharedText) {
+            document.getElementById('urlInput').value = state.sharedText;
+            document.getElementById('sharedBanner').classList.remove('visible');
+            document.getElementById('urlInput').focus();
+        }
+    });
+
+    // ===== HELPERS =====
+    function toast(msg, type = '') {
+        const el = document.getElementById('toast');
+        document.getElementById('toastText').textContent = msg;
+        el.className = 'toast ' + type + ' show';
+        clearTimeout(window._toastTimer);
+        window._toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
     }
 
-    // ===== INIT =====
-    load();
-    $('apiUrlInput').value = state.apiUrl;
-    $('bnfUsername').value = state.bnfUsername;
-    $('bnfPassword').value = state.bnfPassword;
-    renderHistory();
-    $('cacheCount').textContent = state.history.length;
-    updateCookieStatusUI();
-    initCapacitor();
+    function escapeHtml(s) {
+        if (!s) return '';
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
-    // Load server history
-    (async () => {
-        try {
-            const d = await apiCall('/articles?limit=20');
-            if (d.articles) d.articles.forEach(a => addHistory(a.id, a.title || a.url, a.status || 'completed'));
-        } catch(e) { console.log('Server history:', e.message); }
-    })();
+    function formatDate(d) {
+        if (!d) return '';
+        const date = new Date(d);
+        const now = new Date();
+        const diff = (now - date) / 1000;
+        if (diff < 60) return 'À l\'instant';
+        if (diff < 3600) return Math.floor(diff/60) + ' min';
+        if (diff < 86400) return Math.floor(diff/3600) + 'h';
+        return date.toLocaleDateString('fr-FR');
+    }
 
-    console.log('Presse Scraper v3 initialized');
+    window.openExternal = function(url) {
+        window.open(url, '_blank');
+    };
+
+    // ===== ANDROID INTEGRATION =====
+    // Handle shared content from Android
+    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.Intent) {
+        window.Capacitor.Plugins.Intent.getIntentReceived(async (intent) => {
+            if (intent?.text) {
+                handleSharedContent(intent.text);
+            }
+        });
+    }
+
+    // Handle PROCESS_TEXT
+    if (typeof window.Capacitor !== 'undefined') {
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check for shared text in URL params (fallback)
+            const params = new URLSearchParams(window.location.search);
+            const shared = params.get('text') || params.get('url');
+            if (shared) handleSharedContent(shared);
+        });
+    }
+
 })();
 </script>
 </body>

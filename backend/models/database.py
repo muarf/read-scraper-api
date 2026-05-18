@@ -334,6 +334,22 @@ class Database:
         finally:
             conn.close()
     
+    def get_api_key_by_device(self, device_id: str) -> Optional[Dict[str, Any]]:
+        """Vérifier si un device_id a déjà une clé API active"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT * FROM api_keys 
+            WHERE name = ? AND is_active = 1
+        """, (f"device:{device_id}",))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return dict(row)
+        return None
+    
     def verify_api_key(self, key_hash: str) -> Optional[Dict[str, Any]]:
         """Vérifier une clé API et mettre à jour last_used"""
         conn = self.get_connection()
