@@ -133,10 +133,27 @@
         .setting-item { background: var(--bg-card); border-radius: 10px; padding: 14px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
         .setting-item .label { font-size: 13px; font-weight: 500; }
         .setting-item .value { font-size: 12px; color: var(--text-secondary); }
-        .toggle { width: 40px; height: 22px; background: var(--bg-secondary); border-radius: 11px; position: relative; cursor: pointer; transition: background .2s; }
-        .toggle.on { background: var(--accent); }
-        .toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: transform .2s; }
-        .toggle.on::after { transform: translateX(18px); }
+        .setting-item .value.connected { color: var(--success); }
+
+        /* Form inputs in settings */
+        .form-input {
+            width: 100%; background: var(--bg-secondary); border: 1px solid var(--border);
+            border-radius: 8px; padding: 10px 12px; color: var(--text-primary);
+            font-size: 13px; font-family: inherit; outline: none; margin-bottom: 8px;
+        }
+        .form-input:focus { border-color: var(--accent); }
+        .form-input::placeholder { color: #555; }
+
+        /* Cookie status */
+        .cookie-status {
+            display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+            background: var(--bg-card); border-radius: 10px; border: 1px solid var(--border);
+            margin-bottom: 8px; font-size: 13px;
+        }
+        .cookie-status .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .cookie-status .dot.ok { background: var(--success); }
+        .cookie-status .dot.expired { background: var(--warning); }
+        .cookie-status .dot.none { background: var(--accent); }
 
         /* Toast */
         .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500; z-index: 2000; transition: transform .3s ease; display: flex; align-items: center; gap: 8px; max-width: 90%; }
@@ -197,19 +214,36 @@
     <div class="screen" id="settingsScreen">
         <div class="settings-group">
             <h3>Serveur API</h3>
-            <div class="setting-item">
-                <div class="label">URL du serveur</div>
-            </div>
             <div style="padding: 0 14px;">
-                <input type="text" id="apiUrlInput" value="https://presse.qzz.io" style="width:100%; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text-primary); font-size:13px; font-family:inherit; outline:none;">
+                <input type="text" id="apiUrlInput" value="http://141.145.223.71:5000" class="form-input" placeholder="http://IP:5000">
             </div>
         </div>
+
         <div class="settings-group">
-            <h3>Clé API</h3>
+            <h3>Connexion BnF <small style="font-weight:normal;color:var(--text-secondary)">(Europresse)</small></h3>
             <div style="padding: 0 14px;">
-                <input type="password" id="apiKeyInput" placeholder="Votre clé API..." style="width:100%; background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:10px 12px; color:var(--text-primary); font-size:13px; font-family:inherit; outline:none;">
+                <input type="text" id="bnfUsername" class="form-input" placeholder="Identifiant BnF..." autocomplete="off">
+                <input type="password" id="bnfPassword" class="form-input" placeholder="Mot de passe BnF..." autocomplete="off">
+                <button class="action-btn primary" id="saveBnfBtn" style="width:100%;margin-top:4px;">
+                    <i class="fas fa-save"></i> Sauvegarder
+                </button>
             </div>
         </div>
+
+        <div class="settings-group">
+            <h3>Session BnF</h3>
+            <div class="cookie-status" id="cookieStatus">
+                <div class="dot none" id="cookieDot"></div>
+                <span id="cookieText">Non connecté</span>
+            </div>
+            <button class="action-btn secondary" id="loginBnfBtn" style="width:100%;margin-top:8px;">
+                <i class="fas fa-key"></i> Se connecter à Europresse
+            </button>
+            <button class="action-btn secondary" id="clearBnfBtn" style="width:100%;margin-top:8px;">
+                <i class="fas fa-trash"></i> Supprimer les données BnF
+            </button>
+        </div>
+
         <div class="settings-group">
             <h3>Stockage</h3>
             <div class="setting-item">
@@ -237,12 +271,17 @@
     'use strict';
 
     // ===== CONFIG =====
-    const STORAGE_KEY = 'presse_scraper_v2';
+    const STORAGE_KEY = 'presse_scraper_v3';
+    const BNF_AUTH_URL = 'https://bnf.idm.oclc.org/login?url=https://nouveau.europresse.com/access/ip/default.aspx?un=D000067U_1';
+    const BNF_DOMAIN = 'nouveau-europresse-com.bnf.idm.oclc.org';
 
     // ===== STATE =====
     let state = {
-        apiUrl: 'https://presse.qzz.io',
-        apiKey: '',
+        apiUrl: 'http://141.145.223.71:5000',
+        bnfUsername: '',
+        bnfPassword: '',
+        bnfCookies: null,       // [{name, value, domain, path, expires, ...}]
+    bnfCookiesExpiry: null,  // timestamp ms
         history: [],
         currentJobId: null,
         pollInterval: null,
@@ -259,7 +298,12 @@
     }
     function save() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            apiUrl: state.apiUrl, apiKey: state.apiKey, history: state.history
+            apiUrl: state.apiUrl,
+            bnfUsername: state.bnfUsername,
+            bnfPassword: state.bnfPassword,
+            bnfCookies: state.bnfCookies,
+            bnfCookiesExpiry: state.bnfCookiesExpiry,
+            history: state.history
         }));
     }
 
@@ -267,11 +311,13 @@
     const $ = id => document.getElementById(id);
 
     // ===== TOAST =====
+    let toastTimer = null;
     function toast(msg, type='') {
         const el = $('toast');
         $('toastText').textContent = msg;
         el.className = 'toast ' + type + ' show';
-        setTimeout(() => el.classList.remove('show'), 3000);
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
     }
 
     // ===== NAV =====
@@ -288,12 +334,110 @@
     function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
 
     async function apiCall(path, opts={}) {
-        const headers = { 'Content-Type': 'application/json' };
-        if (state.apiKey) headers['X-API-Key'] = state.apiKey;
-        const r = await fetch(apiUrl(path), { ...opts, headers: { ...headers, ...opts.headers } });
+        const url = apiUrl(path);
+        const headers = { 'Content-Type': 'application/json', ...opts.headers };
+
+        // Use native BnfLogin.httpRequest plugin (bypasses WebView restrictions)
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.BnfLogin) {
+            const { BnfLogin } = window.Capacitor.Plugins;
+            const result = await BnfLogin.httpRequest({
+                url: url,
+                method: opts.method || 'GET',
+                headers: headers,
+                body: opts.body ? JSON.parse(opts.body) : null
+            });
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            if (result.status >= 400) {
+                try {
+                    const errData = JSON.parse(result.data);
+                    throw new Error(errData.message || errData.error || 'HTTP ' + result.status);
+                } catch(e) {
+                    throw new Error('HTTP ' + result.status);
+                }
+            }
+            try {
+                return JSON.parse(result.data);
+            } catch(e) {
+                return result.data;
+            }
+        }
+
+        // Fallback to fetch (PWA / browser)
+        const r = await fetch(url, { ...opts, headers });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message || d.error || 'HTTP ' + r.status);
         return d;
+    }
+
+    // ===== COOKIE HELPERS =====
+    function areCookiesValid() {
+        if (!state.bnfCookies || !state.bnfCookies.length) return false;
+        if (!state.bnfCookiesExpiry) return false;
+        // Check if expired (with 5 min buffer)
+        return Date.now() < (state.bnfCookiesExpiry - 300000);
+    }
+
+    function updateCookieStatusUI() {
+        const dot = $('cookieDot');
+        const text = $('cookieText');
+        if (areCookiesValid()) {
+            const exp = new Date(state.bnfCookiesExpiry);
+            dot.className = 'dot ok';
+            text.textContent = `Connecté (expire ${exp.toLocaleDateString('fr-FR')} ${exp.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'})})`;
+        } else if (state.bnfCookies && state.bnfCookies.length) {
+            dot.className = 'dot expired';
+            text.textContent = 'Session expirée — reconnectez-vous';
+        } else {
+            dot.className = 'dot none';
+            text.textContent = 'Non connecté';
+        }
+    }
+
+    // ===== BnF LOGIN via native plugin =====
+    async function loginBnF() {
+        if (!state.bnfUsername || !state.bnfPassword) {
+            toast('Entrez vos credentials BnF dans les paramètres', 'error');
+            return false;
+        }
+
+        // Check if Capacitor + BnfLogin plugin is available
+        if (typeof window.Capacitor === 'undefined' || !window.Capacitor.Plugins || !window.Capacitor.Plugins.BnfLogin) {
+            toast('Plugin BnfLogin non disponible — rebuild needed', 'error');
+            return false;
+        }
+
+        try {
+            const { BnfLogin } = window.Capacitor.Plugins;
+            const result = await BnfLogin.login({
+                username: state.bnfUsername,
+                password: state.bnfPassword
+            });
+
+            if (result.success && result.cookies) {
+                state.bnfCookies = result.cookies;
+                // Set expiry to 8 hours from now (typical BnF session)
+                state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
+                save();
+                updateCookieStatusUI();
+                return true;
+            } else {
+                toast(result.error || 'Échec connexion BnF', 'error');
+                return false;
+            }
+        } catch(e) {
+            console.error('loginBnF error:', e);
+            toast('Erreur: ' + e.message, 'error');
+            return false;
+        }
+    }
+
+    // ===== ENSURE COOKIES (login if needed) =====
+    async function ensureCookies() {
+        if (areCookiesValid()) return true;
+        toast('Connexion à Europresse...', '');
+        return await loginBnF();
     }
 
     // ===== SHARED CONTENT =====
@@ -312,8 +456,6 @@
         if (state.sharedUrl) {
             $('urlInput').value = state.sharedUrl;
         } else if (state.sharedText) {
-            // Si c'est un texte, détecter si c'est une URL
-            const isUrl = state.sharedText.match(/^https?:\/\//);
             $('urlInput').value = state.sharedText;
         }
         $('sharedBanner').classList.remove('visible');
@@ -328,6 +470,7 @@
         const isUrl = input.match(/^https?:\/\//);
         const payload = { url: isUrl ? input : '', search_terms: isUrl ? '' : input };
 
+        // Ensure we have valid BnF cookies
         const btn = $('scrapeBtn');
         const card = $('statusCard');
         const icon = $('statusIcon');
@@ -341,12 +484,26 @@
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>...';
         card.className = 'status-card visible processing';
         icon.className = 'fas fa-spinner fa-spin';
-        title.textContent = 'Création du job...';
-        sub.textContent = ''; fill.style.width = '10%';
+        title.textContent = 'Vérification session BnF...';
+        sub.textContent = ''; fill.style.width = '5%';
         actions.style.display = 'none'; dlBtn.style.display = 'none';
 
         try {
+            // Step 1: Ensure cookies
+            const hasCookies = await ensureCookies();
+            if (!hasCookies) {
+                throw new Error('Impossible de se connecter à Europresse');
+            }
+
+            fill.style.width = '15%';
+            title.textContent = 'Envoi au serveur...';
+
+            // Step 2: Add cookies to payload
+            payload.cookies = state.bnfCookies;
+
+            // Step 3: Send scrape request
             const d = await apiCall('/scrape', { method: 'POST', body: JSON.stringify(payload) });
+
             if (d.cached) {
                 card.className = 'status-card visible success';
                 icon.className = 'fas fa-check-circle';
@@ -371,6 +528,14 @@
             sub.textContent = e.message;
             fill.style.width = '0%';
             toast(e.message, 'error');
+
+            // If auth error, clear cookies so next attempt re-logins
+            if (e.message.includes('401') || e.message.includes('cookie') || e.message.includes('session') || e.message.includes('Europresse')) {
+                state.bnfCookies = null;
+                state.bnfCookiesExpiry = null;
+                save();
+                updateCookieStatusUI();
+            }
         } finally {
             btn.disabled = false; btn.classList.remove('loading');
             btn.innerHTML = '<i class="fas fa-magic"></i> Scraper';
@@ -436,18 +601,26 @@
 
     async function downloadPdf(id) {
         try {
-            const r = await fetch(apiUrl('/article/' + id + '/pdf'), {
-                headers: state.apiKey ? { 'X-API-Key': state.apiKey } : {}
-            });
-            if (!r.ok) throw new Error('Erreur téléchargement');
-            const blob = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = id + '.pdf';
-            a.click();
-            URL.revokeObjectURL(a.href);
-            toast('PDF téléchargé', 'success');
-        } catch(e) { toast(e.message, 'error'); }
+            const url = apiUrl('/article/' + id + '/pdf');
+            const r = await BnfLogin.downloadFile({ url, filename: id + '.pdf' });
+            if (r.error) throw new Error(r.error);
+            toast('PDF sauvegardé: ' + r.path, 'success');
+        } catch(e) {
+            // Fallback: essayer via fetch
+            try {
+                const r = await fetch(url);
+                if (!r.ok) throw new Error('Erreur téléchargement');
+                const blob = await r.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = id + '.pdf';
+                a.click();
+                URL.revokeObjectURL(a.href);
+                toast('PDF téléchargé', 'success');
+            } catch(e2) {
+                toast('Erreur: ' + e.message, 'error');
+            }
+        }
     }
 
     // ===== HISTORY =====
@@ -496,49 +669,84 @@
 
     // ===== SETTINGS =====
     $('apiUrlInput').addEventListener('change', e => { state.apiUrl = e.target.value.replace(/\/+$/, ''); save(); });
-    $('apiKeyInput').addEventListener('change', e => { state.apiKey = e.target.value.trim(); save(); });
+
+    $('saveBnfBtn').addEventListener('click', () => {
+        state.bnfUsername = $('bnfUsername').value.trim();
+        state.bnfPassword = $('bnfPassword').value.trim();
+        if (!state.bnfUsername || !state.bnfPassword) {
+            toast('Entrez identifiant et mot de passe', 'error');
+            return;
+        }
+        save();
+        toast('Credentials BnF sauvegardés', 'success');
+        // Clear existing cookies so next scrape triggers a fresh login
+        state.bnfCookies = null;
+        state.bnfCookiesExpiry = null;
+        save();
+        updateCookieStatusUI();
+    });
+
+    $('loginBnfBtn').addEventListener('click', async () => {
+        if (!state.bnfUsername || !state.bnfPassword) {
+            toast('Entrez vos credentials BnF d\'abord', 'error');
+            return;
+        }
+        $('loginBnfBtn').disabled = true;
+        $('loginBnfBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connexion...';
+        try {
+            await loginBnF();
+        } finally {
+            $('loginBnfBtn').disabled = false;
+            $('loginBnfBtn').innerHTML = '<i class="fas fa-key"></i> Se connecter à Europresse';
+        }
+    });
+
+    $('clearBnfBtn').addEventListener('click', () => {
+        state.bnfUsername = '';
+        state.bnfPassword = '';
+        state.bnfCookies = null;
+        state.bnfCookiesExpiry = null;
+        save();
+        $('bnfUsername').value = '';
+        $('bnfPassword').value = '';
+        updateCookieStatusUI();
+        toast('Données BnF supprimées', 'success');
+    });
+
     $('clearCacheBtn').addEventListener('click', () => {
         state.history = []; save(); renderHistory();
         $('cacheCount').textContent = '0';
         toast('Cache vidé', 'success');
     });
 
-    // ===== EVENTS =====
+    // ===== SCRAPE BUTTON =====
     $('scrapeBtn').addEventListener('click', startScraping);
-    $('urlInput').addEventListener('keypress', e => { if (e.key === 'Enter') startScraping(); });
-    $('downloadBtn').addEventListener('click', () => downloadPdf($('downloadBtn').dataset.id));
     $('cancelBtn').addEventListener('click', cancelJob);
+    $('downloadBtn').addEventListener('click', () => downloadPdf($('downloadBtn').dataset.id));
 
     // ===== CAPACITOR INTEGRATION =====
     function initCapacitor() {
-        // Vérifier si on est dans Capacitor
         if (typeof window.Capacitor === 'undefined') {
             console.log('Running as PWA (no Capacitor)');
             return;
         }
 
         const { App } = window.Capacitor.Plugins;
-        const { Browser } = window.Capacitor.Plugins;
 
-        // Écouter les intents de partage via l'event JS triggeré par le MainActivity
+        // Listen for shared content
         window.addEventListener('sharedText', (e) => {
-            console.log('Shared text received:', e.detail);
             const text = e.detail;
             const isUrl = text.match(/^https?:\/\//);
             showSharedBanner(text, isUrl);
         });
 
         window.addEventListener('sharedUrl', (e) => {
-            console.log('Shared URL received:', e.detail);
             showSharedBanner(e.detail, true);
         });
 
-        // Gérer le retour au premier plan (pour les intents)
+        // Check pending intent on resume
         App.addListener('appStateChange', ({ isActive }) => {
-            if (isActive) {
-                // Vérifier s'il y a un intent en attente via les préférences
-                checkPendingIntent();
-            }
+            if (isActive) checkPendingIntent();
         });
     }
 
@@ -546,8 +754,8 @@
         try {
             if (typeof window.Capacitor === 'undefined') return;
             const { Preferences } = window.Capacitor.Plugins;
-            const text = await Preferences.get({ key: 'shared_text' });
             const url = await Preferences.get({ key: 'shared_url' });
+            const text = await Preferences.get({ key: 'shared_text' });
             if (url.value) {
                 showSharedBanner(url.value, true);
                 await Preferences.remove({ key: 'shared_url' });
@@ -563,12 +771,14 @@
     // ===== INIT =====
     load();
     $('apiUrlInput').value = state.apiUrl;
-    $('apiKeyInput').value = state.apiKey;
+    $('bnfUsername').value = state.bnfUsername;
+    $('bnfPassword').value = state.bnfPassword;
     renderHistory();
     $('cacheCount').textContent = state.history.length;
+    updateCookieStatusUI();
     initCapacitor();
 
-    // Charger l'historique serveur
+    // Load server history
     (async () => {
         try {
             const d = await apiCall('/articles?limit=20');
@@ -576,7 +786,7 @@
         } catch(e) { console.log('Server history:', e.message); }
     })();
 
-    console.log('Presse Scraper Mobile v2 initialized');
+    console.log('Presse Scraper v3 initialized');
 })();
 </script>
 </body>
