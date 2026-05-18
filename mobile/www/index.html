@@ -550,33 +550,28 @@
     // ===== API =====
     function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
 
-    async function apiCall(path, opts = {}) {
+    async function apiCall(path, opts = {}, retry = true) {
         const headers = { 'Content-Type': 'application/json', ...opts.headers };
         if (state.apiKey) headers['X-API-Key'] = state.apiKey;
 
-        const result = await nativeHttpRequest({
-            url: apiUrl(path),
-            method: opts.method || 'GET',
-            headers: headers,
-            body: opts.body ? JSON.stringify(opts.body) : null
-        });
-
-        // If 401, try to register and retry once
-        if (result && result.error && result.error.includes('401')) {
-            console.log('Got 401, trying to register...');
-            const registered = await registerDevice();
-            if (registered && state.apiKey) {
-                headers['X-API-Key'] = state.apiKey;
-                return await nativeHttpRequest({
-                    url: apiUrl(path),
-                    method: opts.method || 'GET',
-                    headers: headers,
-                    body: opts.body ? JSON.stringify(opts.body) : null
-                });
+        try {
+            return await nativeHttpRequest({
+                url: apiUrl(path),
+                method: opts.method || 'GET',
+                headers: headers,
+                body: opts.body ? JSON.stringify(opts.body) : null
+            });
+        } catch(e) {
+            // If 401 and we haven't retried yet, register and retry
+            if (retry && (e.message || '').includes('401')) {
+                console.log('Got 401, registering device...');
+                const registered = await registerDevice();
+                if (registered && state.apiKey) {
+                    return await apiCall(path, opts, false); // retry once, no more retries
+                }
             }
+            throw e;
         }
-
-        return result;
     }
 
     // ===== REGISTER DEVICE =====
@@ -970,9 +965,13 @@
 
     window.regenerateApiKey = async function() {
         try {
-            await registerDevice();
+            const ok = await registerDevice();
             updateSettingsUI();
-            toast('Nouvelle clé API générée', 'success');
+            if (ok) {
+                toast('Nouvelle clé API générée', 'success');
+            } else {
+                toast('Échec de génération de la clé API', 'error');
+            }
         } catch(e) {
             toast('Erreur: ' + e.message, 'error');
         }
