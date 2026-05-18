@@ -438,11 +438,10 @@
         showOnboarding();
     } else {
         showMainApp();
-    }
-
-    // Register device if no API key
-    if (!state.apiKey) {
-        registerDevice();
+        // Register device if no API key (only when main app is shown)
+        if (!state.apiKey) {
+            registerDevice();
+        }
     }
 
     // ===== SCREEN MANAGEMENT =====
@@ -457,9 +456,13 @@
         updateCookieStatusUI();
         renderHistory();
         loadServerHistory();
+        // Register device if no API key
+        if (!state.apiKey) {
+            registerDevice();
+        }
     }
 
-    function switchScreen(screenId) {
+    window.switchScreen = function(screenId) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.nav-btn').forEach(n => n.classList.remove('active'));
         document.getElementById(screenId).classList.add('active');
@@ -467,7 +470,7 @@
 
         if (screenId === 'historyScreen') renderFullHistory();
         if (screenId === 'settingsScreen') updateSettingsUI();
-    }
+    };
 
     // ===== ONBOARDING =====
     window.onboardLogin = async function() {
@@ -660,7 +663,7 @@
                         state.bnfCookies = result.cookies;
                         state.bnfCookiesExpiry = Date.now() + (8 * 60 * 60 * 1000);
                         save();
-                        payload.cookies = state.cookies;
+                        payload.cookies = state.bnfCookies;
                     }
                 } catch(e) {}
             }
