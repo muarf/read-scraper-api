@@ -337,44 +337,31 @@
         const url = apiUrl(path);
         const headers = { 'Content-Type': 'application/json', ...opts.headers };
 
-        // Use cordova-plugin-advanced-http if available (bypasses WebView restrictions)
-        if (typeof cordova !== 'undefined' && cordova.plugin && cordova.plugin.http) {
-            return new Promise((resolve, reject) => {
-                const method = (opts.method || 'GET').toLowerCase();
-                const body = opts.body || null;
-
-                const onSuccess = (response) => {
-                    try {
-                        const data = JSON.parse(response.data);
-                        if (response.status >= 400) {
-                            reject(new Error(data.message || data.error || 'HTTP ' + response.status));
-                        } else {
-                            resolve(data);
-                        }
-                    } catch(e) {
-                        resolve(response.data);
-                    }
-                };
-
-                const onError = (response) => {
-                    try {
-                        const data = JSON.parse(response.error);
-                        reject(new Error(data.message || data.error || 'HTTP ' + response.status));
-                    } catch(e) {
-                        reject(new Error(response.error || 'Network error'));
-                    }
-                };
-
-                if (method === 'post') {
-                    cordova.plugin.http.post(url, body ? JSON.parse(body) : {}, headers, onSuccess, onError);
-                } else if (method === 'put') {
-                    cordova.plugin.http.put(url, body ? JSON.parse(body) : {}, headers, onSuccess, onError);
-                } else if (method === 'delete') {
-                    cordova.plugin.http.delete(url, {}, headers, onSuccess, onError);
-                } else {
-                    cordova.plugin.http.get(url, {}, headers, onSuccess, onError);
-                }
+        // Use native BnfLogin.httpRequest plugin (bypasses WebView restrictions)
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.BnfLogin) {
+            const { BnfLogin } = window.Capacitor.Plugins;
+            const result = await BnfLogin.httpRequest({
+                url: url,
+                method: opts.method || 'GET',
+                headers: headers,
+                body: opts.body ? JSON.parse(opts.body) : null
             });
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            if (result.status >= 400) {
+                try {
+                    const errData = JSON.parse(result.data);
+                    throw new Error(errData.message || errData.error || 'HTTP ' + result.status);
+                } catch(e) {
+                    throw new Error('HTTP ' + result.status);
+                }
+            }
+            try {
+                return JSON.parse(result.data);
+            } catch(e) {
+                return result.data;
+            }
         }
 
         // Fallback to fetch (PWA / browser)

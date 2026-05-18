@@ -42,9 +42,18 @@ jobs:
         working-directory: ./mobile
         run: npx cap sync android
 
-      - name: Install Cordova HTTP plugin
-        working-directory: ./mobile
-        run: npx cap plugin:install cordova-plugin-advanced-http || true
+      - name: Copy BnfLogin plugin source
+        run: |
+          PLUGIN_SRC="mobile/src/plugins/bnf-login/android/src/main/java/io/qzz/pressecraper/BnfLoginPlugin.java"
+          PLUGIN_DST="mobile/android/app/src/main/java/io/qzz/pressecraper/BnfLoginPlugin.java"
+          if [ -f "$PLUGIN_SRC" ]; then
+            cp "$PLUGIN_SRC" "$PLUGIN_DST"
+            echo "BnfLogin plugin copied"
+          else
+            echo "BnfLogin plugin source not found at $PLUGIN_SRC"
+            find mobile/src -name "BnfLoginPlugin.java" 2>/dev/null
+            exit 1
+          fi
 
       - name: Register BnfLogin plugin
         run: |
