@@ -585,12 +585,18 @@
     async function registerDevice() {
         try {
             const deviceId = getDeviceId();
-            const resp = await fetch(apiUrl('/register'), {
+            console.log('Registering device:', deviceId);
+            console.log('Capacitor available:', typeof window.Capacitor !== 'undefined');
+            console.log('BnfLogin plugin:', !!window.Capacitor?.Plugins?.BnfLogin);
+            console.log('Register URL:', apiUrl('/register'));
+            // Use nativeHttpRequest (via BnfLogin plugin) - works on Android
+            const result = await nativeHttpRequest({
+                url: apiUrl('/register'),
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ device_id: deviceId })
             });
-            const result = await resp.json();
+            console.log('Register result:', result);
             if (result.api_key) {
                 state.apiKey = result.api_key;
                 save();
@@ -599,6 +605,7 @@
             }
         } catch(e) {
             console.error('Register failed:', e);
+            toast('Register error: ' + e.message, 'error');
         }
         return false;
     }
