@@ -27,8 +27,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour créer un job de scraping
     @api_bp.route('/scrape', methods=['POST'])
-    @auth.require_api_key
-    @rate_limiter.rate_limit
     def create_scrape_job():
         """Créer un nouveau job de scraping"""
         data = request.get_json()
@@ -96,7 +94,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour obtenir le statut d'un job
     @api_bp.route('/job/<job_id>', methods=['GET'])
-    @auth.require_api_key
     def get_job_status(job_id):
         """Obtenir le statut d'un job"""
         job = db.get_job(job_id)
@@ -132,7 +129,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour obtenir un article
     @api_bp.route('/article/<article_id>', methods=['GET'])
-    @auth.require_api_key
     def get_article(article_id):
         """Obtenir un article par son ID"""
         article = db.get_article(article_id)
@@ -156,7 +152,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour télécharger le PDF
     @api_bp.route('/article/<article_id>/pdf', methods=['GET'])
-    @auth.require_api_key
     def download_pdf(article_id):
         """Télécharger le PDF d'un article"""
         article = db.get_article(article_id)
@@ -191,7 +186,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour obtenir une clé API temporaire (pour les utilisateurs anonymes)
     @api_bp.route('/get-temp-key', methods=['GET'])
-    @rate_limiter.rate_limit
     def get_temp_api_key():
         """Générer une clé API temporaire pour les utilisateurs anonymes"""
         from datetime import datetime, timedelta
@@ -217,7 +211,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour lister les articles (publique pour le frontend)
     @api_bp.route('/articles', methods=['GET'])
-    @rate_limiter.rate_limit
     def list_articles():
         """Lister les articles avec pagination et recherche"""
         limit = request.args.get('limit', 50, type=int)
@@ -255,8 +248,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route de recherche
     @api_bp.route('/search', methods=['GET'])
-    @auth.require_api_key
-    @rate_limiter.rate_limit
     def search_articles():
         """Rechercher dans les articles"""
         query = request.args.get('q')
@@ -277,8 +268,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
     
     # Route pour annuler un job en cours
     @api_bp.route('/job/<job_id>/cancel', methods=['POST'])
-    @auth.require_api_key
-    @rate_limiter.rate_limit
     def cancel_job(job_id):
         """Annuler un job en attente ou en cours de traitement"""
         job = db.get_job(job_id)
@@ -315,8 +304,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour rejeter un article (supprimer l'article associé au job)
     @api_bp.route('/job/<job_id>/reject', methods=['POST'])
-    @auth.require_api_key
-    @rate_limiter.rate_limit
     def reject_job(job_id):
         """Rejeter et supprimer un article associé à un job"""
         job = db.get_job(job_id)
@@ -384,7 +371,6 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
 
     # Route pour lister les screenshots de debug
     @api_bp.route('/debug/screenshots', methods=['GET'])
-    @auth.require_api_key
     def list_debug_screenshots():
         """Lister les screenshots de debug disponibles"""
         try:
