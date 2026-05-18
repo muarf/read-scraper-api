@@ -142,7 +142,7 @@ class ScraperService:
             logger.error(f"Job {job_id} introuvable")
             return
 
-        self.db.update_job_status(job_id, 'processing', step='Initialisation')
+        self.db.update_job_status(job_id, 'processing')
         logger.info(f"Traitement job {job_id}")
 
         try:
@@ -163,19 +163,30 @@ class ScraperService:
 
             session = cookies_to_session(user_cookies)
 
-            # Si on a une URL directe, télécharger directement
-            if url and not url.startswith('search_terms:'):
-                self.db.update_job_status(job_id, 'processing', step='Téléchargement article')
+            # Si c'est une URL Europresse, télécharger directement
+            # Sinon, rechercher d'abord par titre
+            is_europresse = EUROPRESSE_DOMAIN in url or url.startswith(EUROPRESSE_BASE)
+            if url and is_europresse:
+                self.db.update_job_status(job_id, 'processing')
                 article = download_europresse_article(session, url)
             else:
-                # Sinon, rechercher d'abord
+                # URL d'un site de presse → extraire le titre et rechercher sur Europresse
                 if not search_terms:
-                    # Essayer d'extraire les search_terms de l'URL
-                    search_terms = url.replace('search_terms:', '') if url else ''
+                    # Extraire un terme de recherche depuis l'URL (le slug de l'article)
+                    from urllib.parse import urlparse
+                    path = urlparse(url).path
+                    # Prendre le dernier segment du path (le slug)
+                    slug = path.rstrip('/').split('/')[-1] if path else ''
+                    # Nettoyer : enlever l'extension .php/.html, remplacer les tirets par des espaces
+                    search_terms = re.sub(r'\.(php|html|htm|asp)$', '', slug)
+                    search_terms = search_terms.replace('-', ' ').replace('_', ' ')
+                    # Limiter à 80 chars
+                    search_terms = search_terms[:80].strip()
+                    logger.info(f"Search terms extraits de l'URL: {search_terms}")
                 if not search_terms:
-                    raise Exception("Pas de termes de recherche ni d'URL")
+                    raise Exception("Pas de termes de recherche ni d'URL Europresse")
 
-                self.db.update_job_status(job_id, 'processing', step='Recherche Europresse', search_terms=search_terms)
+                self.db.update_job_status(job_id, 'processing')
                 results = search_europresse(session, search_terms)
 
                 if not results:
@@ -183,7 +194,7 @@ class ScraperService:
 
                 # Prendre le premier résultat
                 first = results[0]
-                self.db.update_job_status(job_id, 'processing', step='Téléchargement article', search_terms=search_terms)
+                self.db.update_job_status(job_id, 'processing')
                 article = download_europresse_article(session, first['url'])
 
             # Générer le PDF
@@ -211,6 +222,7 @@ class ScraperService:
 
             self.db.update_job_status(job_id, 'completed', article_id=article_id)
             logger.info(f"Job {job_id} terminé — article {article_id}")
+            return article_id, article
 
         except NoResultException as e:
             logger.warning(f"Job {job_id}: {e}")

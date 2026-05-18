@@ -97,19 +97,13 @@ global_scraper = None
 
 def scraper_callback(url: str, job_id: str):
     """Callback pour le service de scraping"""
-    # Créer une nouvelle instance pour chaque job afin d'éviter les conflits de session Chrome
     scraper = ScraperService(db, pdf_service)
-    logger.info(f"Nouvelle instance de scraper créée pour job {job_id}")
+    logger.info(f"Traitement job {job_id}")
 
     try:
-        return scraper.scrape_article(url, job_id)
+        return scraper.process_job(job_id)
     except Exception as e:
         logger.error(f"Erreur dans scraper_callback pour job {job_id}: {e}")
-        # Nettoyer l'instance
-        try:
-            scraper.cleanup()
-        except:
-            pass
         raise
 
 # Initialisation du queue manager

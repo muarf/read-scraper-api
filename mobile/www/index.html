@@ -601,16 +601,26 @@
 
     async function downloadPdf(id) {
         try {
-            const r = await fetch(apiUrl('/article/' + id + '/pdf'));
-            if (!r.ok) throw new Error('Erreur téléchargement');
-            const blob = await r.blob();
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = id + '.pdf';
-            a.click();
-            URL.revokeObjectURL(a.href);
-            toast('PDF téléchargé', 'success');
-        } catch(e) { toast(e.message, 'error'); }
+            const url = apiUrl('/article/' + id + '/pdf');
+            const r = await BnfLogin.downloadFile({ url, filename: id + '.pdf' });
+            if (r.error) throw new Error(r.error);
+            toast('PDF sauvegardé: ' + r.path, 'success');
+        } catch(e) {
+            // Fallback: essayer via fetch
+            try {
+                const r = await fetch(url);
+                if (!r.ok) throw new Error('Erreur téléchargement');
+                const blob = await r.blob();
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = id + '.pdf';
+                a.click();
+                URL.revokeObjectURL(a.href);
+                toast('PDF téléchargé', 'success');
+            } catch(e2) {
+                toast('Erreur: ' + e.message, 'error');
+            }
+        }
     }
 
     // ===== HISTORY =====

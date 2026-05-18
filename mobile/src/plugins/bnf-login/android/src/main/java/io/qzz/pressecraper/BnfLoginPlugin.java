@@ -314,4 +314,62 @@ public class BnfLoginPlugin extends Plugin {
             }
         }).start();
     }
+
+    @PluginMethod()
+    public void downloadFile(PluginCall call) {
+        String urlStr = call.getString("url", "");
+        String filename = call.getString("filename", "download.pdf");
+
+        if (urlStr.isEmpty()) {
+            JSObject result = new JSObject();
+            result.put("error", "URL required");
+            call.resolve(result);
+            return;
+        }
+
+        new Thread(() -> {
+            try {
+                URL url = new URL(urlStr);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(30000);
+                conn.setReadTimeout(60000);
+
+                int status = conn.getResponseCode();
+                if (status != 200) {
+                    JSObject result = new JSObject();
+                    result.put("error", "HTTP " + status);
+                    call.resolve(result);
+                    return;
+                }
+
+                // Sauvegarder dans le dossier Downloads de l'app
+                java.io.File downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                    android.os.Environment.DIRECTORY_DOCUMENTS);
+                if (!downloadsDir.exists()) downloadsDir.mkdirs();
+                java.io.File outFile = new java.io.File(downloadsDir, filename);
+
+                java.io.InputStream is = conn.getInputStream();
+                java.io.FileOutputStream fos = new java.io.FileOutputStream(outFile);
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = is.read(buffer)) != -1) {
+                    fos.write(buffer, 0, len);
+                }
+                fos.close();
+                is.close();
+
+                JSObject result = new JSObject();
+                result.put("success", true);
+                result.put("path", outFile.getAbsolutePath());
+                call.resolve(result);
+
+            } catch (Exception e) {
+                Log.e(TAG, "downloadFile error", e);
+                JSObject result = new JSObject();
+                result.put("error", e.getMessage());
+                call.resolve(result);
+            }
+        }).start();
+    }
 }

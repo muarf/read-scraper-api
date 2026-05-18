@@ -236,7 +236,7 @@ class Database:
         finally:
             conn.close()
     
-    def update_job_status(self, job_id: str, status: str, 
+    def update_job_status(self, job_id: str, status: str,
                          article_id: str = None, error: str = None) -> bool:
         """Mettre à jour le statut d'un job"""
         conn = self.get_connection()
