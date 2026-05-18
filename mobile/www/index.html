@@ -554,29 +554,52 @@
         const headers = { 'Content-Type': 'application/json', ...opts.headers };
         if (state.apiKey) headers['X-API-Key'] = state.apiKey;
 
-        return await nativeHttpRequest({
+        const result = await nativeHttpRequest({
             url: apiUrl(path),
             method: opts.method || 'GET',
             headers: headers,
             body: opts.body ? JSON.stringify(opts.body) : null
         });
+
+        // If 401, try to register and retry once
+        if (result && result.error && result.error.includes('401')) {
+            console.log('Got 401, trying to register...');
+            const registered = await registerDevice();
+            if (registered && state.apiKey) {
+                headers['X-API-Key'] = state.apiKey;
+                return await nativeHttpRequest({
+                    url: apiUrl(path),
+                    method: opts.method || 'GET',
+                    headers: headers,
+                    body: opts.body ? JSON.stringify(opts.body) : null
+                });
+            }
+        }
+
+        return result;
     }
 
     // ===== REGISTER DEVICE =====
     async function registerDevice() {
         try {
             const deviceId = getDeviceId();
-            const result = await apiCall('/register', {
+            // Use nativeHttpRequest directly to avoid apiCall requiring an API key
+            const result = await nativeHttpRequest({
+                url: apiUrl('/register'),
                 method: 'POST',
-                body: { device_id: deviceId }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: deviceId })
             });
             if (result.api_key) {
                 state.apiKey = result.api_key;
                 save();
+                console.log('API key registered:', state.apiKey.substring(0, 8) + '...');
+                return true;
             }
         } catch(e) {
             console.error('Register failed:', e);
         }
+        return false;
     }
 
     function getDeviceId() {
