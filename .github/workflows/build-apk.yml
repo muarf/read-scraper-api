@@ -42,6 +42,10 @@ jobs:
         working-directory: ./mobile
         run: npx cap sync android
 
+      - name: Install Cordova HTTP plugin
+        working-directory: ./mobile
+        run: npx cap plugin:install cordova-plugin-advanced-http || true
+
       - name: Register BnfLogin plugin
         run: |
           PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"

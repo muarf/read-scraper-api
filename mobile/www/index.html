@@ -335,26 +335,50 @@
 
     async function apiCall(path, opts={}) {
         const url = apiUrl(path);
-        const headers = { 'Content-Type': 'application/json' };
+        const headers = { 'Content-Type': 'application/json', ...opts.headers };
 
-        // Use CapacitorHttp if available (bypasses WebView restrictions)
-        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.Http) {
-            const { Http } = window.Capacitor.Plugins;
-            const result = await Http.request({
-                method: opts.method || 'GET',
-                url: url,
-                headers: { ...headers, ...opts.headers },
-                data: opts.body ? JSON.parse(opts.body) : undefined
+        // Use cordova-plugin-advanced-http if available (bypasses WebView restrictions)
+        if (typeof cordova !== 'undefined' && cordova.plugin && cordova.plugin.http) {
+            return new Promise((resolve, reject) => {
+                const method = (opts.method || 'GET').toLowerCase();
+                const body = opts.body || null;
+
+                const onSuccess = (response) => {
+                    try {
+                        const data = JSON.parse(response.data);
+                        if (response.status >= 400) {
+                            reject(new Error(data.message || data.error || 'HTTP ' + response.status));
+                        } else {
+                            resolve(data);
+                        }
+                    } catch(e) {
+                        resolve(response.data);
+                    }
+                };
+
+                const onError = (response) => {
+                    try {
+                        const data = JSON.parse(response.error);
+                        reject(new Error(data.message || data.error || 'HTTP ' + response.status));
+                    } catch(e) {
+                        reject(new Error(response.error || 'Network error'));
+                    }
+                };
+
+                if (method === 'post') {
+                    cordova.plugin.http.post(url, body ? JSON.parse(body) : {}, headers, onSuccess, onError);
+                } else if (method === 'put') {
+                    cordova.plugin.http.put(url, body ? JSON.parse(body) : {}, headers, onSuccess, onError);
+                } else if (method === 'delete') {
+                    cordova.plugin.http.delete(url, {}, headers, onSuccess, onError);
+                } else {
+                    cordova.plugin.http.get(url, {}, headers, onSuccess, onError);
+                }
             });
-            if (result.status >= 400) {
-                const errMsg = result.data?.message || result.data?.error || 'HTTP ' + result.status;
-                throw new Error(errMsg);
-            }
-            return result.data;
         }
 
         // Fallback to fetch (PWA / browser)
-        const r = await fetch(url, { ...opts, headers: { ...headers, ...opts.headers } });
+        const r = await fetch(url, { ...opts, headers });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message || d.error || 'HTTP ' + r.status);
         return d;
