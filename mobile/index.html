@@ -450,16 +450,23 @@
         document.getElementById('mainApp').style.display = 'none';
     }
 
-    function showMainApp() {
+    async function showMainApp() {
         document.getElementById('onboardingScreen').style.display = 'none';
         document.getElementById('mainApp').style.display = 'block';
         updateCookieStatusUI();
         renderHistory();
         loadServerHistory();
-        // Register device if no API key
+        // Register device if no API key - WAIT for it
         if (!state.apiKey) {
-            registerDevice();
+            const ok = await registerDevice();
+            if (!ok) {
+                // If register failed, try once more after 2s
+                console.log('First register failed, retrying in 2s...');
+                await new Promise(r => setTimeout(r, 2000));
+                await registerDevice();
+            }
         }
+        updateSettingsUI();
     }
 
     window.switchScreen = function(screenId) {
@@ -578,13 +585,12 @@
     async function registerDevice() {
         try {
             const deviceId = getDeviceId();
-            // Use nativeHttpRequest directly to avoid apiCall requiring an API key
-            const result = await nativeHttpRequest({
-                url: apiUrl('/register'),
+            const resp = await fetch(apiUrl('/register'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ device_id: deviceId })
             });
+            const result = await resp.json();
             if (result.api_key) {
                 state.apiKey = result.api_key;
                 save();
@@ -645,6 +651,16 @@
     window.startScraping = async function() {
         const input = document.getElementById('urlInput').value.trim();
         if (!input) { toast('Entrez une URL ou des termes', 'error'); return; }
+
+        // Ensure we have an API key before scraping
+        if (!state.apiKey) {
+            toast('Initialisation en cours...', '');
+            const ok = await registerDevice();
+            if (!ok) {
+                toast('Impossible de se connecter au serveur', 'error');
+                return;
+            }
+        }
 
         const isUrl = input.match(/^https?:\/\//);
         const payload = { url: isUrl ? input : '', search_terms: isUrl ? '' : input };
