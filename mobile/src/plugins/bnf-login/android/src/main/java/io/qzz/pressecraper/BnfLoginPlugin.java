@@ -248,8 +248,8 @@ public class BnfLoginPlugin extends Plugin {
     public void httpRequest(PluginCall call) {
         String urlStr = call.getString("url", "");
         String method = call.getString("method", "GET");
-        JSONObject body = call.getObject("body", null);
-        JSONObject headers = call.getObject("headers", new JSONObject());
+        JSObject bodyObj = call.getObject("body", null);
+        JSObject headersObj = call.getObject("headers", null);
 
         if (urlStr.isEmpty()) {
             JSObject result = new JSObject();
@@ -268,19 +268,19 @@ public class BnfLoginPlugin extends Plugin {
                 conn.setReadTimeout(30000);
 
                 // Set headers
-                if (headers != null) {
-                    java.util.Iterator<String> keys = headers.keys();
+                if (headersObj != null) {
+                    java.util.Iterator<String> keys = headersObj.keys();
                     while (keys.hasNext()) {
                         String key = keys.next();
-                        conn.setRequestProperty(key, headers.getString(key));
+                        conn.setRequestProperty(key, headersObj.getString(key));
                     }
                 }
 
                 // Set body for POST/PUT
-                if (body != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"))) {
+                if (bodyObj != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"))) {
                     conn.setDoOutput(true);
                     OutputStream os = conn.getOutputStream();
-                    os.write(body.toString().getBytes("UTF-8"));
+                    os.write(bodyObj.toString().getBytes("UTF-8"));
                     os.flush();
                     os.close();
                 }
