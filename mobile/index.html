@@ -334,8 +334,27 @@
     function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
 
     async function apiCall(path, opts={}) {
+        const url = apiUrl(path);
         const headers = { 'Content-Type': 'application/json' };
-        const r = await fetch(apiUrl(path), { ...opts, headers: { ...headers, ...opts.headers } });
+
+        // Use CapacitorHttp if available (bypasses WebView restrictions)
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins && window.Capacitor.Plugins.Http) {
+            const { Http } = window.Capacitor.Plugins;
+            const result = await Http.request({
+                method: opts.method || 'GET',
+                url: url,
+                headers: { ...headers, ...opts.headers },
+                data: opts.body ? JSON.parse(opts.body) : undefined
+            });
+            if (result.status >= 400) {
+                const errMsg = result.data?.message || result.data?.error || 'HTTP ' + result.status;
+                throw new Error(errMsg);
+            }
+            return result.data;
+        }
+
+        // Fallback to fetch (PWA / browser)
+        const r = await fetch(url, { ...opts, headers: { ...headers, ...opts.headers } });
         const d = await r.json();
         if (!r.ok) throw new Error(d.message || d.error || 'HTTP ' + r.status);
         return d;
