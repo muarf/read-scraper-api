@@ -211,3 +211,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 chromedriver_local
+static/\nbackend/downloads/\n*.png\n*.html\n*.pdf\napp-debug.apk\nbackend/debug_login_filled.png\nbackend/data/scraper.db
