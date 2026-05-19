@@ -162,7 +162,7 @@ def extract_metadata(url, browser=None, max_words=15):
         ]
         
         # Si le titre contient un mot de la blacklist, on le rejette
-        is_paywall = any(word in f_title.lower() for word in paywall_blacklist)
+        is_paywall = f_title is not None and any(word in f_title.lower() for word in paywall_blacklist)
         
         if f_query and len(f_query.split()) >= 2 and not is_paywall:
             return f_query, f_title, None

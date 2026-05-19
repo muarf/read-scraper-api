@@ -1,0 +1,506 @@
+
+
+<script>
+    
+    var _docName = "news·20260517·PFR·d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672";
+    var _docIndex = 1;
+    var _viewEvent = 10;
+    var _sourceTypeId = "8001";
+    var _docSubType = "609";
+    var _hasComplements = true;
+    var _hasPDF = false;
+    var _pdfKiosque = false;
+    var lbl_closePopup =  'Fermer';
+    var _vidLink = null; // WebTV
+    var _mediatype = null;
+	var _hasMedia = false;
+	var selectLangDefautOption = 'S&#233;lectionner la langue';
+    var _consoleType;
+    var _tvEyesConsolePreviewLink = '';
+		
+			var azurAuthToken = "Bearer eyJhbGciOiJFUzI1NiIsImtpZCI6ImtleTEiLCJ0eXAiOiJKV1QifQ.eyJyZWdpb24iOiJnbG9iYWwiLCJzdWJzY3JpcHRpb24taWQiOiIxMDBkMWUyNDI1ZjQ0MTEwYmY2YTdmN2Y5ZjQyMWU3NSIsInByb2R1Y3QtaWQiOiJUZXh0VHJhbnNsYXRvci5TMSIsImNvZ25pdGl2ZS1zZXJ2aWNlcy1lbmRwb2ludCI6Imh0dHBzOi8vYXBpLmNvZ25pdGl2ZS5taWNyb3NvZnQuY29tL2ludGVybmFsL3YxLjAvIiwiYXp1cmUtcmVzb3VyY2UtaWQiOiIvc3Vic2NyaXB0aW9ucy84ZGVkMWRkMy1lYWQ3LTQ2YzUtODJjMi1hODYzNzY0MzA2YTIvcmVzb3VyY2VHcm91cHMvU2VydmljZXMvcHJvdmlkZXJzL01pY3Jvc29mdC5Db2duaXRpdmVTZXJ2aWNlcy9hY2NvdW50cy9TVkMtdHJhZHVjdGlvbiIsInNjb3BlIjoiaHR0cHM6Ly9hcGkubWljcm9zb2Z0dHJhbnNsYXRvci5jb20vIiwiYXVkIjoidXJuOm1zLm1pY3Jvc29mdHRyYW5zbGF0b3IiLCJleHAiOjE3NzkxNzM5MjMsImlzcyI6InVybjptcy5jb2duaXRpdmVzZXJ2aWNlcyJ9.0oV_OrgsIu8jMtsQhL3bzhhvRTIo0zwUKhuhpmIHw44Cr1IyClt1An5KTMh7k_eF0XqTGHVWdDy2GmUJPPyfCw";
+		
+
+    var languageCode = 1 === 1 ? "fr" : "en";
+	var translateEnable = true;
+    var _hasStubs = false;
+
+    if (typeof _docRefId === 'undefined') {
+        var _docRefId = 0;
+    } else {
+        _docRefId = 0;
+    }
+    var _docType = 1;
+    
+        
+        var lbl_StubTitle = 'Profil';
+        var lbl_StubBirthDate = '';
+        var lbl_StubBirthPlace =  '';
+        var lbl_StubLearnMore = 'En savoir plus';
+        var lbl_StubDateFounded = '';
+		var txt_title_send = 'Envoi de références';
+		var btn_Cancel = 'Annuler';
+		var lbl_Send = 'Envoyer';
+        var _personDic = null;
+		var _orgDic = null;
+		var _docName = 'news·20260517·PFR·d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672';
+        
+                var _docPrintUrl = "/WebPages/Document/DocPrintSave.aspx?Event=2&TypeDoc=NEWS&DocName=news%C2%B720260517%C2%B7PFR%C2%B7d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672&DocRef_Id=0";
+            
+            var _docSaveUrl = "/WebPages/Document/DocSave.aspx?Event=10&TypeDoc=NEWS&DocName=news%C2%B720260517%C2%B7PFR%C2%B7d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672&DocRef_Id=0";
+            var _txtPopupSave = "Exporter";
+            
+            var _docTransUrl = "/WebPages/TranslateDoc.aspx?Event=1&DocName=news%C2%B720260517%C2%B7PFR%C2%B7d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672&DocRef_Id=0";
+            var _urlFullscreen = "/Document/ViewMobile?docKey=news%C2%B720260517%C2%B7PFR%C2%B7d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672&fromBasket=false&viewEvent=1&invoiceCode=&FullScreen=1";
+                
+	var _keyDoc = 'news·20260517·PFR·d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672';
+</script>
+
+<style>
+    .customBtn {
+        padding: 5px;
+        overflow: visible;
+        height: 30px;
+        font-family: 'Montserrat',sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        outline: none;
+    }
+
+
+    .whiteBtn {
+        background: none no-repeat scroll 0 0 #FFFFFF;
+        color: #333333;
+        border: 1px solid #C5C5C5;
+    }
+
+    .shadowBox {
+        -o-box-shadow: 0em 0.2em 0.2em #DDDDDD;
+        -moz-box-shadow: 0em 0.2em 0.2em #DDDDDD;
+        -webkit-box-shadow: 0em 0.2em 0.2em #DDDDDD;
+        box-shadow: 0em 0.2em 0.2em #DDDDDD;
+    }
+</style>
+
+<script type="text/javascript" language="javascript">
+
+        var isGARUser = 'False';
+        var isUnderAge = 'False';
+        var acceptRisk = sessionStorage.getItem("acceptRisk");
+        var url = '';
+
+        var documentText = `&lt;article&gt;
+    &lt;header&gt;
+        
+
+
+
+            &lt;div class=&quot;icon-logo-container&quot;&gt;
+
+
+            &lt;/div&gt;
+
+
+
+
+
+
+
+    &lt;img class=&quot;sm-margin-bottom&quot; src=&quot;https://nouveau-europresse-com.bnf.idm.oclc.org/Docviewer.aspx?DocName=pfr3_small.gif&quot; /&gt;&lt;span class=&quot;icon-Information&quot; sourcecode=&quot;PFR&quot;&gt;&lt;/span&gt;
+
+
+&lt;div class=&quot;rdp__DocPublicationName&quot;&gt;
+    &lt;span class=&quot;DocPublicationName&quot;&gt;
+        Le Parisien (site web)                &lt;br /&gt;Edition principale    &lt;/span&gt;
+&lt;/div&gt;
+&lt;div class=&quot;rdp__DocHeader&quot;&gt;
+    &lt;span class=&quot;DocHeader&quot;&gt;
+        dimanche 17 mai 2026 880 mots&lt;/span&gt;
+&lt;/div&gt;
+
+
+
+
+
+
+&lt;div class=&quot;titreArticle&quot;&gt;
+
+        &lt;p class=&quot;sm-margin-TopNews titreArticleVisu rdp__articletitle&quot;&gt;
+Une &lt;mark&gt; juge&lt;/mark&gt; &lt;mark&gt; demande&lt;/mark&gt; &#224; l&#39;&lt;mark&gt;administration&lt;/mark&gt; &lt;mark&gt; p&#233;nitentiaire&lt;/mark&gt; &#224; &lt;mark&gt; mettre&lt;/mark&gt; &lt;mark&gt; fin&lt;/mark&gt; &#224; &#171; l&#39;&lt;mark&gt;indignit&#233;&lt;/mark&gt; &#187; des &lt;mark&gt; conditions&lt;/mark&gt; de &lt;mark&gt; d&#233;tention&lt;/mark&gt; de &lt;mark&gt; R&#233;doine&lt;/mark&gt; &lt;mark&gt; Faid&lt;/mark&gt;            
+        &lt;/p&gt;
+
+&lt;/div&gt;
+
+
+
+
+
+
+
+    &lt;/header&gt;
+
+    &lt;section&gt;
+        
+&lt;div class=&quot;DocText clearfix&quot;&gt;
+
+&lt;div class=&#39;docOcurrContainer&#39; style=&quot;&quot;&gt;
+    &lt;p&gt;Encore plus de trente-deux ans &#224; tenir. Avec une telle perspective, &lt;a target=&quot;_blank&quot; href=&quot;https://www.leparisien.fr/faits-divers/nous-avons-rencontre-redoine-faid-en-prison-les-erreurs-ne-se-regrettent-pas-elles-sassument-01-11-2023-6HABF4DFIVG2BEEBTLUUAPOCRA.php&quot;&gt;&lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt; &lt;/a&gt; , le braqueur de 51 ans originaire de Creil (Oise) &#233;crou&#233; depuis le 1er juillet 2011 et dont la &lt;mark&gt;fin&lt;/mark&gt; de peine est pr&#233;cis&#233;ment pr&#233;vue le 17 ao&#251;t 2057, aspire &#224; des &lt;mark&gt;conditions&lt;/mark&gt; de vie derri&#232;re les barreaux les plus normales possibles. Un voeu qui reste pieux malgr&#233; plusieurs d&#233;cisions de justice &lt;a target=&quot;_blank&quot; href=&quot;https://www.leparisien.fr/faits-divers/la-justice-estime-que-les-conditions-de-detention-du-braqueur-redoine-faid-sont-indignes-et-exige-dy-mettre-fin-21-07-2025-6TVZWPJZPNAA7ODVFH56P4IBHI.php&quot;&gt;d&#233;clarant ses &lt;mark&gt;conditions&lt;/mark&gt; de &lt;mark&gt;d&#233;tention&lt;/mark&gt; &#171; contraires &#224; la dignit&#233; de la personne &#187; &lt;/a&gt;. Elles se heurtent, en effet, &#224; la position de l&#39;&lt;mark&gt;administration&lt;/mark&gt; &lt;mark&gt;p&#233;nitentiaire&lt;/mark&gt; (AP), qui, en la mati&#232;re, a le dernier mot. Et s&#39;oppose le plus souvent aux d&#233;cisions favorables &#224; ce prisonnier, c&#233;l&#232;bre pour ses deux &#233;vasions, et donc surveill&#233; de pr&#232;s.&lt;/p&gt;
+
+
+&lt;p&gt;Selon nos informations, &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt;, d&#233;tenu depuis octobre 2025 &lt;a target=&quot;_blank&quot; href=&quot;https://www.leparisien.fr/faits-divers/le-braqueur-et-roi-de-levasion-redoine-faid-transfere-vers-une-nouvelle-prison-tenue-secrete-21-08-2025-E7A4C6TRIFGTXOP4NMJPNJAIPA.php&quot;&gt;au centre &lt;mark&gt;p&#233;nitentiaire&lt;/mark&gt; d&#39;Alen&#231;on-Cond&#233;-sur-Sarthe &lt;/a&gt; (Orne), vient de remporter une nouvelle partie dans son d&#233;sormais tr&#232;s long bras de fer avec l&#39;AP. Par une ordonnance du 15 mai, une &lt;mark&gt;juge&lt;/mark&gt; d&#39;application des peines d&#39;Alen&#231;on (Orne) a d&#233;clar&#233; bien-fond&#233;e la derni&#232;re requ&#234;te de &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt;, d&#233;pos&#233;e par son avocat, Me Beno&#238;t David, le 9 avril, quant &#224; ses &lt;mark&gt;conditions&lt;/mark&gt; de &lt;mark&gt;d&#233;tention&lt;/mark&gt; depuis son transfert &#224; Cond&#233;. &lt;/p&gt; &lt;p&gt;&lt;em style=&quot;font-weight:bold;&quot;&gt; Un d&#233;placement de la &lt;mark&gt;juge&lt;/mark&gt; &#224; la prison &lt;/em&gt;&lt;/p&gt;&lt;p&gt;&#171; De par leur combinaison, leur dur&#233;e et de l&#39;absence d&#39;&#233;volution et de perspectives donn&#233;es au d&#233;tenu, &lt;em style=&quot;font-style:italic;&quot;&gt;[elles]&lt;/em&gt;sont contraires &#224; la dignit&#233; de la personne humaine &#187;, rel&#232;ve la magistrate, en listant sept de ces &lt;mark&gt;conditions&lt;/mark&gt;. &lt;/p&gt; &lt;p&gt; Parmi lesquelles : des parloirs syst&#233;matiquement &#233;quip&#233;s d&#39;un hygiaphone depuis le 4 octobre 2018 (avec une seule interruption entre septembre et d&#233;cembre 2025), l&#39;absence d&#39;unit&#233; de vie familiale depuis la m&#234;me date, le caract&#232;re al&#233;atoire des sorties de promenade, l&#39;impossibilit&#233; d&#39;avoir des perspectives concr&#232;tes sur l&#39;&#233;volution de ses &lt;mark&gt;conditions&lt;/mark&gt; de &lt;mark&gt;d&#233;tention&lt;/mark&gt;... &lt;/p&gt; &lt;p&gt; La &lt;mark&gt;juge&lt;/mark&gt; d&#39;application des peines s&#39;est d&#233;plac&#233;e &#224; Cond&#233;-sur-Sarthe lundi pour v&#233;rifier la r&#233;alit&#233; des griefs soulev&#233;s par &lt;mark&gt;Fa&#239;d&lt;/mark&gt;, accompagn&#233;e d&#39;un magistrat du parquet d&#39;Alen&#231;on et de Me David. Sa d&#233;cision rendue ce 15 mai fixe un d&#233;lai de trente jours pour permettre &#224; l&#39;&lt;mark&gt;administration&lt;/mark&gt; &lt;mark&gt;p&#233;nitentiaire&lt;/mark&gt; de &lt;mark&gt;mettre&lt;/mark&gt; &#171; &lt;mark&gt;fin&lt;/mark&gt; &#224; l&#39;&lt;mark&gt;indignit&#233;&lt;/mark&gt; de ces &lt;mark&gt;conditions&lt;/mark&gt; de &lt;mark&gt;d&#233;tention&lt;/mark&gt;, par tout moyen &#187;. &lt;/p&gt; &lt;p&gt; Le parquet a fait appel de cette d&#233;cision. &#171; Un appel suspensif &#187;, pr&#233;cise Me Laure Berrebi Amsellem, l&#39;autre avocate de &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt;, qui qualifie la situation carc&#233;rale de ce dernier d&#39;&#171; isolement d&#233;guis&#233; &#187;. &lt;/p&gt; &lt;p&gt;&lt;em style=&quot;font-weight:bold;&quot;&gt;&#171; En pratique, c&#39;est comme s&#39;il &#233;tait &#224; l&#39;isolement &#187;&lt;/em&gt;&lt;/p&gt;&lt;p&gt;En d&#233;pit d&#39;une d&#233;cision de justice de 2025 ordonnant le retour &#224; un r&#233;gime en &#171; &lt;mark&gt;d&#233;tention&lt;/mark&gt; ordinaire &#187; pour &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt; (qui &#233;tait plac&#233; &#224; l&#39;isolement depuis a minima 12 ans), Me Laure Berrebi Amsellem estime &#171; qu&#39;en pratique, c&#39;est comme s&#39;il &#233;tait &#224; l&#39;isolement &#187;. La p&#233;naliste donne un exemple. &#171; D&#232;s que &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt; se d&#233;place, pour le sport, la promenade ou l&#39;infirmerie, l&#39;&lt;mark&gt;administration&lt;/mark&gt; &lt;mark&gt;p&#233;nitentiaire&lt;/mark&gt; s&#39;arrange pour qu&#39;il se retrouve seul. On lui fait croire qu&#39;il n&#39;est plus &#224; l&#39;isolement, alors que, concr&#232;tement, c&#39;est le cas ! &#187; r&#233;agit-elle. &lt;/p&gt; &lt;p&gt; Comme le soulignait d&#233;j&#224; Me Beno&#238;t David en plaidant une requ&#234;te &lt;a target=&quot;_blank&quot; href=&quot;https://www.leparisien.fr/faits-divers/redoine-faid-veut-des-parloirs-normaux-ne-pas-prendre-ses-proches-dans-vos-bras-provoque-un-trouble-inoui-27-12-2023-4PK62XISOFBCVH5MGYL2BOQ4PA.php&quot;&gt;en d&#233;cembre 2023&lt;/a&gt; , la gestion s&#233;curis&#233;e du d&#233;tenu &lt;mark&gt;Fa&#239;d&lt;/mark&gt; - &#224; commencer par les parloirs hygiaphone - a des r&#233;percussions importantes sur les relations avec ses proches et sur son &#233;tat somatique, et psychique. &lt;/p&gt; &lt;p&gt; &#171; &#199;a va faire cinq ans que je n&#39;ai touch&#233; personne. Cognitivement et sensoriellement, cette situation aggrave mon &#233;tat physique et psychologique. Le toucher est vital pour les &#234;tres sociaux que nous sommes. Le fait de ne pas pouvoir prendre vos proches dans vos bras provoque un trouble inou&#239; &#187;, attestait l&#39;ex-braqueur en personne en 2022. &lt;/p&gt; &lt;p&gt; Son avocate insiste &#233;galement sur les restrictions &#171; drastiques &#187; qui seraient impos&#233;es &#224; ses activit&#233;s : une heure de sport par semaine sans acc&#232;s au terrain, une heure de promenade quotidienne &#171; de mani&#232;re al&#233;atoire &#187;, ce qui accro&#238;t la d&#233;sorientation d&#39;un prisonnier qui ne sait jamais quand il va quitter sa cellule. Pour Me Berrebi Amsellem, ces mesures apparaissent d&#39;autant plus &#171; injustifi&#233;es &#187; que &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt; fait preuve, selon elle, d&#39;un &#171; comportement exemplaire &#187; en &lt;mark&gt;d&#233;tention&lt;/mark&gt;. &lt;/p&gt; &lt;p&gt;&lt;em style=&quot;font-weight:bold;&quot;&gt;Des mesures justifi&#233;es par son &#171; profil p&#233;nal et ses ant&#233;c&#233;dents &#187;&lt;/em&gt;&lt;/p&gt;&lt;p&gt;&#171; Quel est donc l&#39;int&#233;r&#234;t de tout cela ? Le but reste tout de m&#234;me de pr&#233;parer la r&#233;insertion &#187;, questionne la p&#233;naliste, malgr&#233; tout satisfaite de la d&#233;cision rendue par la &lt;mark&gt;juge&lt;/mark&gt; d&#39;application des peines d&#39;Alen&#231;on. D&#233;cision que l&#39;&lt;mark&gt;administration&lt;/mark&gt; &lt;mark&gt;p&#233;nitentiaire&lt;/mark&gt; peut ne pas suivre. Un constat qui peut amener &#224; s&#39;interroger sur l&#39;effectivit&#233; des d&#233;cisions de justice &#171; dans une d&#233;mocratie &#187;, glisse encore la p&#233;naliste. &lt;/p&gt; &lt;p&gt; De son c&#244;t&#233;, l&#39;AP, dernier d&#233;cideur, donc, a fait ses observations dans le cadre de cette requ&#234;te de &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt;. Le directeur de Cond&#233;-sur-Sarthe a confirm&#233; que l&#39;aile dans laquelle &#233;tait h&#233;berg&#233; l&#39;int&#233;ress&#233; n&#39;est pas un &#171; secteur sp&#233;cifique ou d&#233;rogatoire &#187;, mais rel&#232;ve d&#39;un &#171; r&#233;gime de &lt;mark&gt;d&#233;tention&lt;/mark&gt; ordinaire &#187;. &lt;/p&gt; &lt;p&gt; Quant aux mesures de s&#233;curit&#233;s appliqu&#233;es, le m&#234;me pr&#233;cise qu&#39;elles sont justifi&#233;es par le &#171; profil p&#233;nal et ses ant&#233;c&#233;dents ainsi que son inscription au r&#233;pertoire des d&#233;tenus particuli&#232;rement surveill&#233;s (DPS) &#187;. &lt;/p&gt; &lt;p&gt; Enfin, sur la question de l&#39;hygiaphone, le directeur &lt;mark&gt;juge&lt;/mark&gt; l&#233;gitime ce dispositif, au regard, l&#224; encore, des ant&#233;c&#233;dents de &lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt;Fa&#239;d&lt;/mark&gt; et de &#171; l&#39;existence de raisons s&#233;rieuses de redouter un incident &#187;. &lt;/p&gt; &lt;p&gt; Le bras de fer est appel&#233; &#224; se poursuivre. Il n&#39;est dans l&#39;int&#233;r&#234;t de personne qu&#39;il s&#39;&#233;ternise pendant trente-deux ans.&lt;/p&gt;
+
+    
+
+            &lt;a href=&quot;https://www.leparisien.fr/faits-divers/une-juge-demande-a-ladministration-penitentiaire-a-mettre-fin-a-lindignite-des-conditions-de-detention-de-redoine-faid-16-05-2026-MG33LTAUBJDUVCABRFNVQBYCRQ.php&quot; target=&quot;_blank&quot;&gt; Cet article est paru dans Le Parisien (site web)&lt;/a&gt;
+        &lt;p /&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+    &lt;/section&gt;
+
+    &lt;aside&gt;
+        
+
+
+
+
+&lt;div class=&quot;rdp__attachnews&quot;&gt;
+        &lt;p&gt;&lt;b&gt;Illustration(s) : &lt;/b&gt;&lt;/p&gt;
+
+        &lt;p&gt;
+            
+                            &lt;div class=&quot;ImageAttach&quot;&gt;&lt;mark&gt;R&#233;doine&lt;/mark&gt; &lt;mark&gt; Fa&#239;d&lt;/mark&gt; (ici en 2010), braqueur connu pour deux &#233;vasions spectaculaires, est d&#233;tenu depuis octobre 2025 au centre &lt;mark&gt; p&#233;nitentiaire&lt;/mark&gt; d&#39;Alen&#231;on-Cond&#233;-sur-Sarthe dans l&#39;Orne. LP/Olivier Arandel &lt;/div&gt;.
+
+        &lt;/p&gt;
+&lt;/div&gt;
+
+
+
+    &lt;/aside&gt;
+
+    &lt;footer&gt;
+        
+
+
+&lt;div&gt;
+
+&lt;/div&gt;
+&lt;a name=&quot;complement&quot;&gt;&lt;/a&gt;
+
+
+
+
+
+
+
+    &lt;div class=&quot;correction&quot;&gt;
+        
+    &lt;/div&gt;
+
+
+    &lt;div class=&quot;Doc-ComplementsBasPage&quot; id=&quot;divMoreLikeThis&quot;&gt;
+        &lt;div class=&quot;complementTitle&quot;&gt;&amp;#192; lire aussi : &lt;/div&gt;
+        &lt;div id=&quot;moreLikeThisLinks&quot;&gt;&lt;/div&gt;
+    &lt;/div&gt;
+
+&lt;div id=&quot;entityList&quot;&gt;&lt;/div&gt;
+
+
+        &lt;div class=&quot;Doc-LegalInfo&quot;&gt;
+                    &lt;small style=&quot;word-wrap: break-word; overflow-wrap: break-word; word-break: break-all;&quot;&gt;
+                        &amp;#169; 2026 Le Parisien. Tous droits r&amp;#233;serv&amp;#233;s.
+                    &lt;/small&gt;
+                    &lt;br /&gt;
+                    &lt;small&gt;Le pr&#233;sent document est prot&#233;g&#233; par les lois et conventions internationales sur le droit d&#39;auteur et son utilisation est r&#233;gie par ces lois et conventions.&lt;/small&gt;
+
+            
+        &lt;/div&gt;
+&lt;div id=&quot;divPubliC&quot; class=&quot;rdp__certificat&quot;&gt;    
+    &lt;div class=&quot;publiC-lblNodoc&quot;&gt;news&amp;#183;20260517&amp;#183;PFR&amp;#183;d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672&lt;/div&gt;
+&lt;/div&gt;
+    &lt;/footer&gt;
+&lt;/article&gt;`;
+        var testHTML = $.parseHTML(documentText);
+        documentText = testHTML[0].data;
+
+	if (isGARUser.toString().toLowerCase() == 'true') {
+		if (isUnderAge.toLowerCase() === 'true') {
+                documentText = disableExternalLink();
+                $("#docText").html(documentText);
+            } else {
+                $("#btnUnderstand").click(function () {
+                    sessionStorage.setItem('acceptRisk', true);
+                    window.open(url, '_blank');
+                    $("#documentAlert").dialog("close");
+                });
+
+                $("#btnCancel").click(function () {
+                    $("#documentAlert").dialog("close");
+                    documentText = disableExternalLink();
+                    $("#docText").html(documentText);
+                });
+
+                $("#closeIcon").click(function () {
+                    $("#documentAlert").hide();
+                    $("#documentAlert").dialog("close");
+                });
+
+                $(".docContainer a").click(function (event) {
+                    acceptRisk = sessionStorage.getItem("acceptRisk");
+                    event.preventDefault();
+                    url = event.target.href;
+                    if (url && url.lastIndexOf('./') === (url.length - 2)) {
+                        url = url.replace('./', "");
+                    }
+                    if (!url) {
+                        if (event.target.nodeName.toLowerCase() !== "a") {
+                            if (event.target.innerHTML.trim().indexOf("http") > -1) {
+                                url = event.target.innerHTML.trim();
+                            }
+                        }
+					}
+					window.open(url, '_blank');
+                });
+            }
+
+        }
+
+    function disableExternalLink() {
+
+            var disableMail = 'True';
+            var allhrefs = documentText.toString().match(/<a[\s]+([^>]+)>((?:.(?!\<\/a\>))*.)<\/a>/g);
+            //disableMail = 'true';
+            if (allhrefs) {
+                allhrefs.forEach(item => {
+                    if (item.indexOf("mailto:") === -1) {
+                        let text = item.match(/(?<=<a.*>).+(?=<\/a>)/g)[0];
+                        let disabledLink = `<a href="javascript:void(0)"> ${text} </a>`;
+                        documentText = documentText.replace(item, disabledLink);
+                    } else {
+                        if (disableMail.toString().toLowerCase() === 'true' || isUnderAge === 'true') {
+                            let text = item.match(/(?<=<a.*>).+(?=<\/a>)/g)[0];
+                            let disabledLink = `<a href="javascript:void(0)"> ${text} </a>`;
+                            documentText = documentText.replace(item, disabledLink);
+                        }
+                    }
+                });
+            }
+            return documentText;
+        }
+
+</script>
+
+<div class="docContainer">
+    <div id="docHeader" class="noSwipe">
+            <div class="doc-in-bskt">
+                <button type="button" id="deleteFromBasket" title="Retirer des documents &#233;pingl&#233;s" class="btn-dlt-basket" style="display:none">
+                    <i class="fa fa-thumbtack"></i>
+                </button>
+            </div>
+        <div id="divSourceType"  style="float:right">
+
+<div id="sourceType">
+    <span class="ico ico_Tile_PrintMedia"></span>
+    <div class="titreSection" title="Presse">
+        Presse
+        <div style="font-weight:normal">Presse web &nbsp;</div>
+    </div>
+</div>
+        </div>
+
+        <div id="divActions">
+            <div style="float: right">
+                <div class="close_bg">
+                    <i id="btClose" title="Retour &#224; la liste" class="fa fa-lg fa-times tab-close-btn"></i>
+                </div>
+            </div>
+
+<script>
+    var ChurnzeroKey =window.location.host.toLowerCase().indexOf('europresse') >-1 ? '1!YiOvofs045bLR4Cqm8W2L4gCOUKnxBT5QsPfValndNgtDE4':'1!SteJDbATaqtqUxcB5xtHaCoxkM26e48F2V6OFeK6w3Et893';
+    var Uid = 'aaf.gca@bnf.fr';
+    var AccountId = '';
+	ChrunzeroValidate(ChurnzeroKey, Uid, AccountId);
+</script>
+
+
+<button type="button" id="btnActionsSubMenu" title="Show Menu"><i class="fa fa-chevron-down"></i></button>
+<span id="divActionsSubMenu">
+        <span class="actions-item" title="Traduire" id="translate-action-item">
+            <button id="btTranslate" class="butons translate_normal docButton"></button>
+            <span class="actions-submenu-lbl">Traduire</span>
+            <select id="languagesList" class="hidden-select"></select>
+        </span>
+            <span class="actions-item">
+            <button id="btnBasketDownloadDoc" title="Exporter" class="docButton butons download_normal"></button>
+            <span class="actions-submenu-lbl">Exporter</span>
+                <div id="overlay-download-menu" class="overlay-reference-menu-mobile">
+                    <div class="reference-menu-container">
+                        <div id="save-pdf-doc">Exporter au format PDF</div>
+                        <div id="save-ris-doc">Exporter au format RIS</div>
+                    </div>
+                </div>
+                <div id="download-menu" class="reference-menu-container-desktop">
+                    <div id="save-pdf-doc">Exporter au format PDF</div>
+                    <div id="save-ris-doc">Exporter au format RIS</div>
+                </div>
+
+
+        </span>
+            <span class="actions-item">
+            <button id="btPrint" title="Imprimer" class="docButton butons print_normal"></button>
+            <span class="actions-submenu-lbl">Imprimer</span>
+        </span>
+                    <span class="actions-item actions-bskt">
+                <button id="btAddBasket" title="Ajouter aux documents &#233;pingl&#233;s" class="docButton butons background_normal"><i class="fa fa-thumbtack"></i></button>
+                <span class="actions-submenu-lbl">&#201;pingler le document</span>
+        </span>
+</span>        </div>
+        <img id="imgWait" src="/images/Interface/WaitAnim/Preloader_spinerCirclesGrowOblique_16x16.gif" class="docButton" />
+    </div>
+    <div id="disclaimer" class="info-box">
+        <div class="content">
+            <div>
+                Ce document a &#233;t&#233; traduit &#224; l’aide d’un outil de traduction automatique. <span id="link-back-to-original">Revenir &#224; la version originale.</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="docText">
+        <article>
+    <header>
+        
+
+
+
+            <div class="icon-logo-container">
+
+
+            </div>
+
+
+
+
+
+
+
+    <img class="sm-margin-bottom" src="https://nouveau-europresse-com.bnf.idm.oclc.org/Docviewer.aspx?DocName=pfr3_small.gif" /><span class="icon-Information" sourcecode="PFR"></span>
+
+
+<div class="rdp__DocPublicationName">
+    <span class="DocPublicationName">
+        Le Parisien (site web)                <br />Edition principale    </span>
+</div>
+<div class="rdp__DocHeader">
+    <span class="DocHeader">
+        dimanche 17 mai 2026 880 mots</span>
+</div>
+
+
+
+
+
+
+<div class="titreArticle">
+
+        <p class="sm-margin-TopNews titreArticleVisu rdp__articletitle">
+Une <mark> juge</mark> <mark> demande</mark> à l'<mark>administration</mark> <mark> pénitentiaire</mark> à <mark> mettre</mark> <mark> fin</mark> à « l'<mark>indignité</mark> » des <mark> conditions</mark> de <mark> détention</mark> de <mark> Rédoine</mark> <mark> Faid</mark>            
+        </p>
+
+</div>
+
+
+
+
+
+
+
+    </header>
+
+    <section>
+        
+<div class="DocText clearfix">
+
+<div class='docOcurrContainer' style="">
+    <p>Encore plus de trente-deux ans à tenir. Avec une telle perspective, <a target="_blank" href="https://www.leparisien.fr/faits-divers/nous-avons-rencontre-redoine-faid-en-prison-les-erreurs-ne-se-regrettent-pas-elles-sassument-01-11-2023-6HABF4DFIVG2BEEBTLUUAPOCRA.php"><mark>Rédoine</mark> <mark>Faïd</mark> </a> , le braqueur de 51 ans originaire de Creil (Oise) écroué depuis le 1er juillet 2011 et dont la <mark>fin</mark> de peine est précisément prévue le 17 août 2057, aspire à des <mark>conditions</mark> de vie derrière les barreaux les plus normales possibles. Un voeu qui reste pieux malgré plusieurs décisions de justice <a target="_blank" href="https://www.leparisien.fr/faits-divers/la-justice-estime-que-les-conditions-de-detention-du-braqueur-redoine-faid-sont-indignes-et-exige-dy-mettre-fin-21-07-2025-6TVZWPJZPNAA7ODVFH56P4IBHI.php">déclarant ses <mark>conditions</mark> de <mark>détention</mark> « contraires à la dignité de la personne » </a>. Elles se heurtent, en effet, à la position de l'<mark>administration</mark> <mark>pénitentiaire</mark> (AP), qui, en la matière, a le dernier mot. Et s'oppose le plus souvent aux décisions favorables à ce prisonnier, célèbre pour ses deux évasions, et donc surveillé de près.</p>
+
+
+<p>Selon nos informations, <mark>Rédoine</mark> <mark>Faïd</mark>, détenu depuis octobre 2025 <a target="_blank" href="https://www.leparisien.fr/faits-divers/le-braqueur-et-roi-de-levasion-redoine-faid-transfere-vers-une-nouvelle-prison-tenue-secrete-21-08-2025-E7A4C6TRIFGTXOP4NMJPNJAIPA.php">au centre <mark>pénitentiaire</mark> d'Alençon-Condé-sur-Sarthe </a> (Orne), vient de remporter une nouvelle partie dans son désormais très long bras de fer avec l'AP. Par une ordonnance du 15 mai, une <mark>juge</mark> d'application des peines d'Alençon (Orne) a déclaré bien-fondée la dernière requête de <mark>Rédoine</mark> <mark>Faïd</mark>, déposée par son avocat, Me Benoît David, le 9 avril, quant à ses <mark>conditions</mark> de <mark>détention</mark> depuis son transfert à Condé. </p> <p><em style="font-weight:bold;"> Un déplacement de la <mark>juge</mark> à la prison </em></p><p>« De par leur combinaison, leur durée et de l'absence d'évolution et de perspectives données au détenu, <em style="font-style:italic;">[elles]</em>sont contraires à la dignité de la personne humaine », relève la magistrate, en listant sept de ces <mark>conditions</mark>. </p> <p> Parmi lesquelles : des parloirs systématiquement équipés d'un hygiaphone depuis le 4 octobre 2018 (avec une seule interruption entre septembre et décembre 2025), l'absence d'unité de vie familiale depuis la même date, le caractère aléatoire des sorties de promenade, l'impossibilité d'avoir des perspectives concrètes sur l'évolution de ses <mark>conditions</mark> de <mark>détention</mark>... </p> <p> La <mark>juge</mark> d'application des peines s'est déplacée à Condé-sur-Sarthe lundi pour vérifier la réalité des griefs soulevés par <mark>Faïd</mark>, accompagnée d'un magistrat du parquet d'Alençon et de Me David. Sa décision rendue ce 15 mai fixe un délai de trente jours pour permettre à l'<mark>administration</mark> <mark>pénitentiaire</mark> de <mark>mettre</mark> « <mark>fin</mark> à l'<mark>indignité</mark> de ces <mark>conditions</mark> de <mark>détention</mark>, par tout moyen ». </p> <p> Le parquet a fait appel de cette décision. « Un appel suspensif », précise Me Laure Berrebi Amsellem, l'autre avocate de <mark>Rédoine</mark> <mark>Faïd</mark>, qui qualifie la situation carcérale de ce dernier d'« isolement déguisé ». </p> <p><em style="font-weight:bold;">« En pratique, c'est comme s'il était à l'isolement »</em></p><p>En dépit d'une décision de justice de 2025 ordonnant le retour à un régime en « <mark>détention</mark> ordinaire » pour <mark>Rédoine</mark> <mark>Faïd</mark> (qui était placé à l'isolement depuis a minima 12 ans), Me Laure Berrebi Amsellem estime « qu'en pratique, c'est comme s'il était à l'isolement ». La pénaliste donne un exemple. « Dès que <mark>Rédoine</mark> <mark>Faïd</mark> se déplace, pour le sport, la promenade ou l'infirmerie, l'<mark>administration</mark> <mark>pénitentiaire</mark> s'arrange pour qu'il se retrouve seul. On lui fait croire qu'il n'est plus à l'isolement, alors que, concrètement, c'est le cas ! » réagit-elle. </p> <p> Comme le soulignait déjà Me Benoît David en plaidant une requête <a target="_blank" href="https://www.leparisien.fr/faits-divers/redoine-faid-veut-des-parloirs-normaux-ne-pas-prendre-ses-proches-dans-vos-bras-provoque-un-trouble-inoui-27-12-2023-4PK62XISOFBCVH5MGYL2BOQ4PA.php">en décembre 2023</a> , la gestion sécurisée du détenu <mark>Faïd</mark> - à commencer par les parloirs hygiaphone - a des répercussions importantes sur les relations avec ses proches et sur son état somatique, et psychique. </p> <p> « Ça va faire cinq ans que je n'ai touché personne. Cognitivement et sensoriellement, cette situation aggrave mon état physique et psychologique. Le toucher est vital pour les êtres sociaux que nous sommes. Le fait de ne pas pouvoir prendre vos proches dans vos bras provoque un trouble inouï », attestait l'ex-braqueur en personne en 2022. </p> <p> Son avocate insiste également sur les restrictions « drastiques » qui seraient imposées à ses activités : une heure de sport par semaine sans accès au terrain, une heure de promenade quotidienne « de manière aléatoire », ce qui accroît la désorientation d'un prisonnier qui ne sait jamais quand il va quitter sa cellule. Pour Me Berrebi Amsellem, ces mesures apparaissent d'autant plus « injustifiées » que <mark>Rédoine</mark> <mark>Faïd</mark> fait preuve, selon elle, d'un « comportement exemplaire » en <mark>détention</mark>. </p> <p><em style="font-weight:bold;">Des mesures justifiées par son « profil pénal et ses antécédents »</em></p><p>« Quel est donc l'intérêt de tout cela ? Le but reste tout de même de préparer la réinsertion », questionne la pénaliste, malgré tout satisfaite de la décision rendue par la <mark>juge</mark> d'application des peines d'Alençon. Décision que l'<mark>administration</mark> <mark>pénitentiaire</mark> peut ne pas suivre. Un constat qui peut amener à s'interroger sur l'effectivité des décisions de justice « dans une démocratie », glisse encore la pénaliste. </p> <p> De son côté, l'AP, dernier décideur, donc, a fait ses observations dans le cadre de cette requête de <mark>Rédoine</mark> <mark>Faïd</mark>. Le directeur de Condé-sur-Sarthe a confirmé que l'aile dans laquelle était hébergé l'intéressé n'est pas un « secteur spécifique ou dérogatoire », mais relève d'un « régime de <mark>détention</mark> ordinaire ». </p> <p> Quant aux mesures de sécurités appliquées, le même précise qu'elles sont justifiées par le « profil pénal et ses antécédents ainsi que son inscription au répertoire des détenus particulièrement surveillés (DPS) ». </p> <p> Enfin, sur la question de l'hygiaphone, le directeur <mark>juge</mark> légitime ce dispositif, au regard, là encore, des antécédents de <mark>Rédoine</mark> <mark>Faïd</mark> et de « l'existence de raisons sérieuses de redouter un incident ». </p> <p> Le bras de fer est appelé à se poursuivre. Il n'est dans l'intérêt de personne qu'il s'éternise pendant trente-deux ans.</p>
+
+    
+
+            <a href="https://www.leparisien.fr/faits-divers/une-juge-demande-a-ladministration-penitentiaire-a-mettre-fin-a-lindignite-des-conditions-de-detention-de-redoine-faid-16-05-2026-MG33LTAUBJDUVCABRFNVQBYCRQ.php" target="_blank"> Cet article est paru dans Le Parisien (site web)</a>
+        <p />
+</div>
+</div>
+    </section>
+
+    <aside>
+        
+
+
+
+
+<div class="rdp__attachnews">
+        <p><b>Illustration(s) : </b></p>
+
+        <p>
+            
+                            <div class="ImageAttach"><mark>Rédoine</mark> <mark> Faïd</mark> (ici en 2010), braqueur connu pour deux évasions spectaculaires, est détenu depuis octobre 2025 au centre <mark> pénitentiaire</mark> d'Alençon-Condé-sur-Sarthe dans l'Orne. LP/Olivier Arandel </div>.
+
+        </p>
+</div>
+
+
+
+    </aside>
+
+    <footer>
+        
+
+
+<div>
+
+</div>
+<a name="complement"></a>
+
+
+
+
+
+
+
+    <div class="correction">
+        
+    </div>
+
+
+    <div class="Doc-ComplementsBasPage" id="divMoreLikeThis">
+        <div class="complementTitle">&#192; lire aussi : </div>
+        <div id="moreLikeThisLinks"></div>
+    </div>
+
+<div id="entityList"></div>
+
+
+        <div class="Doc-LegalInfo">
+                    <small style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-all;">
+                        &#169; 2026 Le Parisien. Tous droits r&#233;serv&#233;s.
+                    </small>
+                    <br />
+                    <small>Le présent document est protégé par les lois et conventions internationales sur le droit d'auteur et son utilisation est régie par ces lois et conventions.</small>
+
+            
+        </div>
+<div id="divPubliC" class="rdp__certificat">    
+    <div class="publiC-lblNodoc">news&#183;20260517&#183;PFR&#183;d6b266e6f0878d44ca4cb3f1a77fa6666f2b8672</div>
+</div>
+    </footer>
+</article>
+    </div>
+
+
+
+    <div id="docFooter">
+        <a name="complement"></a>
+
+    </div>
+</div>

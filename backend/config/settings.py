@@ -4,6 +4,10 @@ Configuration centralisée pour l'application
 import os
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Charger .env depuis la racine du projet
+load_dotenv(str(Path(__file__).resolve().parent.parent.parent / ".env"))
 
 # Chemins - répertoire racine du projet (forcé)
 BASE_DIR = Path(__file__).resolve().parent.parent
