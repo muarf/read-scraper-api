@@ -586,7 +586,6 @@
         try {
             const deviceId = getDeviceId();
             console.log('Registering device:', deviceId);
-            // Use nativeHttpRequest (via BnfLogin plugin) - works on Android
             const result = await nativeHttpRequest({
                 url: apiUrl('/register'),
                 method: 'POST',
@@ -602,6 +601,29 @@
             }
         } catch(e) {
             console.error('Register failed:', e);
+            // If 409 Conflict, device already registered - clear and retry with new ID
+            if (e.message && e.message.includes('409')) {
+                console.log('Device already registered, clearing and retrying...');
+                localStorage.removeItem('device_id');
+                localStorage.removeItem(STORAGE_KEY);
+                try {
+                    const newDeviceId = getDeviceId();
+                    const result2 = await nativeHttpRequest({
+                        url: apiUrl('/register'),
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ device_id: newDeviceId })
+                    });
+                    if (result2.api_key) {
+                        state.apiKey = result2.api_key;
+                        save();
+                        console.log('API key registered (retry):', state.apiKey.substring(0, 8) + '...');
+                        return true;
+                    }
+                } catch(e2) {
+                    console.error('Register retry failed:', e2);
+                }
+            }
             toast('Register error: ' + e.message, 'error');
         }
         return false;
