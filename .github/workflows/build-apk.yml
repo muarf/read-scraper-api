@@ -79,6 +79,41 @@ jobs:
             echo '[{"pkg":"BnfLogin","classpath":"io.qzz.pressecraper.BnfLoginPlugin"}]' > "$PLUGINS_FILE"
           fi
 
+
+      - name: Copy BackgroundPoll plugin source
+        run: |
+          PLUGIN_SRC="mobile/src/plugins/background-poll/android/src/main/java/io/qzz/pressecraper/BackgroundPollPlugin.java"
+          PLUGIN_DST="mobile/android/app/src/main/java/io/qzz/pressecraper/BackgroundPollPlugin.java"
+          if [ -f "$PLUGIN_SRC" ]; then
+            cp "$PLUGIN_SRC" "$PLUGIN_DST"
+            echo "BackgroundPoll plugin copied"
+          else
+            echo "BackgroundPoll plugin source not found at $PLUGIN_SRC"
+            find mobile/src -name "BackgroundPollPlugin.java" 2>/dev/null
+            exit 1
+          fi
+
+      - name: Register BackgroundPoll plugin
+        run: |
+          PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"
+          if [ -f "$PLUGINS_FILE" ]; then
+            python3 -c "
+import json
+with open('$PLUGINS_FILE', 'r') as f:
+    plugins = json.load(f)
+if not any(p.get('classpath', '').endswith('BackgroundPollPlugin') for p in plugins):
+    plugins.append({
+        'pkg': 'BackgroundPoll',
+        'classpath': 'io.qzz.pressecraper.BackgroundPollPlugin'
+    })
+    with open('$PLUGINS_FILE', 'w') as f:
+        json.dump(plugins, f, indent=2)
+    print('BackgroundPoll plugin registered')
+else:
+    print('BackgroundPoll plugin already registered')
+"
+          fi
+
       - name: Allow cleartext HTTP traffic
         run: |
           MANIFEST="mobile/android/app/src/main/AndroidManifest.xml"
