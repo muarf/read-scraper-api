@@ -98,20 +98,20 @@ jobs:
           PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"
           if [ -f "$PLUGINS_FILE" ]; then
             python3 -c "
-import json
-with open('$PLUGINS_FILE', 'r') as f:
-    plugins = json.load(f)
-if not any(p.get('classpath', '').endswith('BackgroundPollPlugin') for p in plugins):
-    plugins.append({
-        'pkg': 'BackgroundPoll',
-        'classpath': 'io.qzz.pressecraper.BackgroundPollPlugin'
-    })
-    with open('$PLUGINS_FILE', 'w') as f:
-        json.dump(plugins, f, indent=2)
-    print('BackgroundPoll plugin registered')
-else:
-    print('BackgroundPoll plugin already registered')
-"
+          import json
+          with open('$PLUGINS_FILE', 'r') as f:
+              plugins = json.load(f)
+          if not any(p.get('classpath', '').endswith('BackgroundPollPlugin') for p in plugins):
+              plugins.append({
+                  'pkg': 'BackgroundPoll',
+                  'classpath': 'io.qzz.pressecraper.BackgroundPollPlugin'
+              })
+              with open('$PLUGINS_FILE', 'w') as f:
+                  json.dump(plugins, f, indent=2)
+              print('BackgroundPoll plugin registered')
+          else:
+              print('BackgroundPoll plugin already registered')
+          "
           fi
 
       - name: Allow cleartext HTTP traffic
