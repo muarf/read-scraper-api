@@ -202,8 +202,8 @@
         }
 
         /* Toast */
-        .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500; z-index: 2000; transition: transform .3s ease; display: flex; align-items: center; gap: 8px; max-width: 90%; }
-        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 500; z-index: 2000; transition: transform .3s ease, opacity .3s ease; display: flex; align-items: center; gap: 8px; max-width: 90%; opacity: 0; pointer-events: none; }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; pointer-events: auto; }
         .toast.success { border-color: var(--success); }
         .toast.error { border-color: var(--accent); }
 
@@ -554,8 +554,20 @@
         return d;
     }
 
-    // ===== API =====
-    function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
+    // ===== NATIVE NOTIFICATION =====
+    async function showNativeNotification(title, body, articleId) {
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BnfLogin) {
+            try {
+                await window.Capacitor.Plugins.BnfLogin.showNotification({
+                    title: title,
+                    body: body,
+                    articleId: articleId || ''
+                });
+            } catch(e) {
+                console.log('Notification failed:', e);
+            }
+        }
+    }
 
     async function apiCall(path, opts = {}, retry = true) {
         const headers = { 'Content-Type': 'application/json', ...opts.headers };
@@ -738,15 +750,11 @@
             });
 
             if (result.status === 'completed' && result.article_id) {
-                // Cache hit
-                fill.style.width = '100%';
-                title.textContent = '✅ Article trouvé en cache !';
-                sub.textContent = '';
-                card.className = 'status-card visible success';
-                icon.className = 'fas fa-check-circle';
+                // Cache hit - open article automatically
                 state.currentArticleId = result.article_id;
-                actions.style.display = 'flex';
-                openBtn.style.display = 'inline-flex';
+                toast('✅ Article trouvé !', 'success');
+                showNativeNotification('📰 Article trouvé', result.article_title || 'Nouvel article', result.article_id);
+                openArticleById(result.article_id);
             } else if (result.job_id) {
                 state.currentJobId = result.job_id;
                 state.currentArticleId = null;
@@ -812,8 +820,12 @@
                         status: 'completed'
                     });
 
-                    openBtn.style.display = 'inline-flex';
                     resetScrapeBtn();
+                    toast('✅ Article téléchargé !', 'success');
+                    // Show native notification
+                    showNativeNotification('📰 Article téléchargé', job.article_title || 'Nouvel article', job.article_id);
+                    // Open article automatically
+                    openArticleById(job.article_id);
                 } else if (job.status === 'failed') {
                     clearInterval(state.pollInterval);
                     state.pollInterval = null;
@@ -848,16 +860,20 @@
     // ===== ARTICLE VIEWER =====
     window.openArticle = async function() {
         if (!state.currentArticleId) return;
+        await openArticleById(state.currentArticleId);
+    };
 
+    async function openArticleById(articleId) {
         try {
-            const article = await apiCall('/article/' + state.currentArticleId);
+            const article = await apiCall('/article/' + articleId);
             switchScreen('articleScreen');
             document.getElementById('viewerArticleTitle').textContent = article.title || 'Article';
             document.getElementById('articleContent').innerHTML = article.html_content || '<p>Contenu indisponible</p>';
+            state.currentArticleId = articleId;
         } catch(e) {
             toast('Erreur: ' + e.message, 'error');
         }
-    };
+    }
 
     window.closeArticle = function() {
         switchScreen('homeScreen');
@@ -1095,10 +1111,35 @@
         });
     }
 
-    // Handle PROCESS_TEXT
+    // Handle shared text/URL from Android intents
     if (typeof window.Capacitor !== 'undefined') {
+        const { App } = window.Capacitor.Plugins;
+
+        // Listen for shared text from ACTION_SEND and ACTION_PROCESS_TEXT
+        if (App) {
+            App.addListener('appUrlOpen', (data) => {
+                if (data.url) handleSharedContent(data.url);
+            });
+        }
+
+        // Listen for notification click to open article
+        document.addEventListener('openArticle', (e) => {
+            if (e.detail) {
+                state.currentArticleId = e.detail;
+                openArticleById(e.detail);
+            }
+        });
+
+        // The MainActivity sends events via triggerWindowJSEvent
+        document.addEventListener('sharedText', (e) => {
+            if (e.detail) handleSharedContent(e.detail);
+        });
+        document.addEventListener('sharedUrl', (e) => {
+            if (e.detail) handleSharedContent(e.detail);
+        });
+
+        // Also check URL params on load (fallback)
         document.addEventListener('DOMContentLoaded', () => {
-            // Check for shared text in URL params (fallback)
             const params = new URLSearchParams(window.location.search);
             const shared = params.get('text') || params.get('url');
             if (shared) handleSharedContent(shared);

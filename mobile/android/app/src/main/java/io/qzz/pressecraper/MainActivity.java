@@ -32,6 +32,14 @@ public class MainActivity extends BridgeActivity {
         String type = intent.getType();
         Log.d(TAG, "Intent: action=" + action + " type=" + type);
 
+        // Handle notification click - open specific article
+        String openArticleId = intent.getStringExtra("openArticleId");
+        if (openArticleId != null && !openArticleId.isEmpty()) {
+            Log.d(TAG, "Open article from notification: " + openArticleId);
+            notifyJs("openArticle", openArticleId);
+            return;
+        }
+
         if (Intent.ACTION_SEND.equals(action) && type != null) {
             if ("text/plain".equals(type) || "text/html".equals(type)) {
                 String sharedText = intent.getStringExtra(Intent.EXTRA_TEXT);

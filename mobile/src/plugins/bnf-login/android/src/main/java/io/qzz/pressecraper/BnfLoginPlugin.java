@@ -373,4 +373,56 @@ public class BnfLoginPlugin extends Plugin {
             }
         }).start();
     }
+
+    @PluginMethod()
+    public void showNotification(PluginCall call) {
+        String title = call.getString("title", "Presse Scraper");
+        String body = call.getString("body", "");
+        String articleId = call.getString("articleId", "");
+
+        try {
+            android.app.NotificationManager notificationManager =
+                (android.app.NotificationManager) getContext().getSystemService(android.content.Context.NOTIFICATION_SERVICE);
+
+            // Create notification channel for Android O+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                android.app.NotificationChannel channel = new android.app.NotificationChannel(
+                    "presse_scraper", "Articles", android.app.NotificationManager.IMPORTANCE_DEFAULT);
+                channel.setDescription("Notifications d'articles téléchargés");
+                notificationManager.createNotificationChannel(channel);
+            }
+
+            // Build intent to open the app
+            android.content.Intent intent = new android.content.Intent(getContext(), MainActivity.class);
+            intent.setFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            if (articleId != null && !articleId.isEmpty()) {
+                intent.putExtra("openArticleId", articleId);
+            }
+
+            android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(
+                getContext(), 0, intent,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+
+            // Build notification
+            androidx.core.app.NotificationCompat.Builder builder =
+                new androidx.core.app.NotificationCompat.Builder(getContext(), "presse_scraper")
+                    .setSmallIcon(android.R.drawable.ic_menu_info_details)
+                    .setContentTitle(title)
+                    .setContentText(body)
+                    .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                    .setContentIntent(pendingIntent)
+                    .setAutoCancel(true);
+
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+
+            JSObject result = new JSObject();
+            result.put("success", true);
+            call.resolve(result);
+        } catch (Exception e) {
+            Log.e(TAG, "showNotification error", e);
+            JSObject result = new JSObject();
+            result.put("error", e.getMessage());
+            call.resolve(result);
+        }
+    }
 }
