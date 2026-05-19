@@ -586,9 +586,6 @@
         try {
             const deviceId = getDeviceId();
             console.log('Registering device:', deviceId);
-            console.log('Capacitor available:', typeof window.Capacitor !== 'undefined');
-            console.log('BnfLogin plugin:', !!window.Capacitor?.Plugins?.BnfLogin);
-            console.log('Register URL:', apiUrl('/register'));
             // Use nativeHttpRequest (via BnfLogin plugin) - works on Android
             const result = await nativeHttpRequest({
                 url: apiUrl('/register'),

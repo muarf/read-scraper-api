@@ -277,10 +277,11 @@ public class BnfLoginPlugin extends Plugin {
                 }
 
                 // Set body for POST/PUT
-                if (bodyObj != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"))) {
+                String bodyStr = call.getString("body", null);
+                if (bodyStr != null && (method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT"))) {
                     conn.setDoOutput(true);
                     OutputStream os = conn.getOutputStream();
-                    os.write(bodyObj.toString().getBytes("UTF-8"));
+                    os.write(bodyStr.getBytes("UTF-8"));
                     os.flush();
                     os.close();
                 }
