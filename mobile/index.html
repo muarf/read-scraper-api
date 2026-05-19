@@ -408,7 +408,8 @@
         currentJobId: null,
         currentArticleId: null,
         pollInterval: null,
-        sharedText: null
+        sharedText: null,
+        notificationSent: false
     };
 
     // ===== STORAGE =====
@@ -702,6 +703,9 @@
         const input = document.getElementById('urlInput').value.trim();
         if (!input) { toast('Entrez une URL ou des termes', 'error'); return; }
 
+        // Reset notification flag for new scrape
+        state.notificationSent = false;
+
         // Ensure we have an API key before scraping
         if (!state.apiKey) {
             toast('Initialisation en cours...', '');
@@ -834,8 +838,11 @@
 
                     resetScrapeBtn();
                     toast('✅ Article téléchargé !', 'success');
-                    // Show native notification
-                    showNativeNotification('📰 Article téléchargé', job.article_title || 'Nouvel article', job.article_id);
+                    // Show native notification (only once per article)
+                    if (!state.notificationSent) {
+                        state.notificationSent = true;
+                        showNativeNotification('📰 Article téléchargé', job.article_title || 'Nouvel article', job.article_id);
+                    }
                     // Open article automatically
                     openArticleById(job.article_id);
                 } else if (job.status === 'failed') {
@@ -1125,17 +1132,21 @@
 
     // Handle shared text/URL from Android intents
     if (typeof window.Capacitor !== 'undefined') {
-        // The MainActivity sends events via triggerWindowJSEvent (on window, not document)
+        // The MainActivity sends events via triggerWindowJSEvent
+        // Capacitor uses MessageEvent with data in e.data (not e.detail)
         window.addEventListener('sharedText', (e) => {
-            if (e.detail) handleSharedContent(e.detail);
+            const data = e.detail || e.data;
+            if (data) handleSharedContent(data);
         });
         window.addEventListener('sharedUrl', (e) => {
-            if (e.detail) handleSharedContent(e.detail);
+            const data = e.detail || e.data;
+            if (data) handleSharedContent(data);
         });
         window.addEventListener('openArticle', (e) => {
-            if (e.detail) {
-                state.currentArticleId = e.detail;
-                openArticleById(e.detail);
+            const data = e.detail || e.data;
+            if (data) {
+                state.currentArticleId = data;
+                openArticleById(data);
             }
         });
     }
