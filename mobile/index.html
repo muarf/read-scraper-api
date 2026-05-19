@@ -467,6 +467,15 @@
             }
         }
         updateSettingsUI();
+        // Request notification permission on Android 13+
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BnfLogin) {
+            try {
+                const { BnfLogin } = window.Capacitor.Plugins;
+                await BnfLogin.requestNotificationPermission();
+            } catch(e) {
+                console.log('Notification permission not available:', e);
+            }
+        }
     }
 
     window.switchScreen = function(screenId) {
@@ -1116,36 +1125,18 @@
 
     // Handle shared text/URL from Android intents
     if (typeof window.Capacitor !== 'undefined') {
-        const { App } = window.Capacitor.Plugins;
-
-        // Listen for shared text from ACTION_SEND and ACTION_PROCESS_TEXT
-        if (App) {
-            App.addListener('appUrlOpen', (data) => {
-                if (data.url) handleSharedContent(data.url);
-            });
-        }
-
-        // Listen for notification click to open article
-        document.addEventListener('openArticle', (e) => {
+        // The MainActivity sends events via triggerWindowJSEvent (on window, not document)
+        window.addEventListener('sharedText', (e) => {
+            if (e.detail) handleSharedContent(e.detail);
+        });
+        window.addEventListener('sharedUrl', (e) => {
+            if (e.detail) handleSharedContent(e.detail);
+        });
+        window.addEventListener('openArticle', (e) => {
             if (e.detail) {
                 state.currentArticleId = e.detail;
                 openArticleById(e.detail);
             }
-        });
-
-        // The MainActivity sends events via triggerWindowJSEvent
-        document.addEventListener('sharedText', (e) => {
-            if (e.detail) handleSharedContent(e.detail);
-        });
-        document.addEventListener('sharedUrl', (e) => {
-            if (e.detail) handleSharedContent(e.detail);
-        });
-
-        // Also check URL params on load (fallback)
-        document.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const shared = params.get('text') || params.get('url');
-            if (shared) handleSharedContent(shared);
         });
     }
 

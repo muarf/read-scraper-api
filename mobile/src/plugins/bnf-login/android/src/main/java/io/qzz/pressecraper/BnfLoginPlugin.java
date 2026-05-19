@@ -425,4 +425,20 @@ public class BnfLoginPlugin extends Plugin {
             call.resolve(result);
         }
     }
+
+    @PluginMethod()
+    public void requestNotificationPermission(PluginCall call) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ needs runtime permission
+            if (getContext().checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                    != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                // Request permission via activity
+                getActivity().requestPermissions(
+                    new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 1001);
+            }
+        }
+        JSObject result = new JSObject();
+        result.put("success", true);
+        call.resolve(result);
+    }
 }
