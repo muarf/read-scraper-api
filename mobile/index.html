@@ -554,6 +554,9 @@
         return d;
     }
 
+    // ===== API =====
+    function apiUrl(path) { return state.apiUrl + '/api/v1' + path; }
+
     // ===== NATIVE NOTIFICATION =====
     async function showNativeNotification(title, body, articleId) {
         if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BnfLogin) {
