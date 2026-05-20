@@ -36,7 +36,7 @@ jobs:
         working-directory: ./mobile
         run: |
           mkdir -p www
-          cp index.html www/
+          cp www/index.html index.html
 
       - name: Sync Capacitor
         working-directory: ./mobile

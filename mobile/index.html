@@ -793,6 +793,7 @@
 
     function pollJob(jobId) {
         if (state.pollInterval) clearInterval(state.pollInterval);
+        state.currentJobId = jobId;
 
         const card = document.getElementById('statusCard');
         const icon = document.getElementById('statusIcon');
@@ -803,6 +804,41 @@
 
         let progress = 25;
 
+        // Use native background polling if available (works when app is in background)
+        if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.BackgroundPoll) {
+            console.log('[POLL] Using native BackgroundPoll plugin');
+            const baseUrl = state.apiUrl || window.location.origin;
+            window.Capacitor.Plugins.BackgroundPoll.startPolling({
+                jobId: jobId,
+                apiUrl: baseUrl,
+                apiKey: state.apiKey || ''
+            });
+            // Still do JS polling for UI updates (will be suspended in background)
+            state.pollInterval = setInterval(async () => {
+                try {
+                    const job = await apiCall('/job/' + jobId);
+                    progress = Math.min(progress + 10, 90);
+                    fill.style.width = progress + '%';
+                    const stepMap = {
+                        'pending': 'En attente...',
+                        'processing': job.step_description || 'Traitement...',
+                        'completed': '✅ Terminé !',
+                        'failed': '❌ Échec'
+                    };
+                    title.textContent = stepMap[job.status] || job.status;
+                    if (job.article_title) sub.textContent = job.article_title;
+                    if (job.status === 'completed' || job.status === 'failed') {
+                        clearInterval(state.pollInterval);
+                        state.pollInterval = null;
+                        window.Capacitor.Plugins.BackgroundPoll.stopPolling();
+                    }
+                } catch(e) { console.error('Poll error:', e); }
+            }, 3000);
+            return;
+        }
+
+        // Fallback: JS-only polling (won't work in background)
+        console.log('[POLL] Using JS-only polling');
         state.pollInterval = setInterval(async () => {
             try {
                 const job = await apiCall('/job/' + jobId);
@@ -1075,12 +1111,18 @@
 
     // ===== SHARED CONTENT =====
     window.handleSharedContent = function(text) {
+        console.log('[SHARE] handleSharedContent called with:', text);
         state.sharedText = text;
         const isUrl = text.match(/^https?:\/\//);
         const banner = document.getElementById('sharedBanner');
+        if (!banner) {
+            console.log('[SHARE] sharedBanner element not found!');
+            return;
+        }
         document.getElementById('sharedLabel').textContent = isUrl ? 'Lien partagé' : 'Texte partagé';
         document.getElementById('sharedContent').textContent = text.length ? text.substring(0, 60) + (text.length > 60 ? '...' : '') : '';
         banner.classList.add('visible');
+        console.log('[SHARE] banner should be visible now');
     };
 
     document.getElementById('useSharedBtn').addEventListener('click', () => {
@@ -1121,24 +1163,32 @@
     };
 
     // ===== ANDROID INTEGRATION =====
-    // Handle shared content from Android
-    if (typeof window.Capacitor !== 'undefined' && window.Capacitor.Plugins?.Intent) {
-        window.Capacitor.Plugins.Intent.getIntentReceived(async (intent) => {
-            if (intent?.text) {
-                handleSharedContent(intent.text);
+    // Handle shared content from Android intents
+    // Capacitor triggerWindowJSEvent fires a MessageEvent on window
+    if (typeof window.Capacitor !== 'undefined') {
+        console.log('[SHARE] Capacitor detected, registering listeners');
+        window.addEventListener('message', (e) => {
+            console.log('[SHARE] message event received:', e.data);
+            if (!e.data) return;
+            const type = e.data.type || e.data.event;
+            const data = e.data.data || e.data.payload || e.data;
+            console.log('[SHARE] parsed type:', type, 'data:', data);
+            if (type === 'sharedText' || type === 'sharedUrl') {
+                if (data) handleSharedContent(typeof data === 'string' ? data : JSON.stringify(data));
+            } else if (type === 'openArticle') {
+                state.currentArticleId = data;
+                openArticleById(data);
             }
         });
-    }
 
-    // Handle shared text/URL from Android intents
-    if (typeof window.Capacitor !== 'undefined') {
-        // The MainActivity sends events via triggerWindowJSEvent
-        // Capacitor uses MessageEvent with data in e.data (not e.detail)
+        // Also listen for CustomEvent (older Capacitor or manual dispatch)
         window.addEventListener('sharedText', (e) => {
+            console.log('[SHARE] sharedText CustomEvent received, detail:', e.detail, 'data:', e.data);
             const data = e.detail || e.data;
             if (data) handleSharedContent(data);
         });
         window.addEventListener('sharedUrl', (e) => {
+            console.log('[SHARE] sharedUrl CustomEvent received, detail:', e.detail, 'data:', e.data);
             const data = e.detail || e.data;
             if (data) handleSharedContent(data);
         });
@@ -1149,6 +1199,70 @@
                 openArticleById(data);
             }
         });
+
+        // When app resumes from background, check if any job completed while away
+        // and show notification retroactively
+        if (window.Capacitor.Plugins?.App) {
+            window.Capacitor.Plugins.App.addListener('resume', () => {
+                console.log('[NOTIF] app resumed, checking pending jobs');
+                if (state.currentJobId && !state.notificationSent) {
+                    // Check job status and show notification if completed
+                    apiCall('/job/' + state.currentJobId).then(job => {
+                        if (job.status === 'completed' && job.article_title) {
+                            state.notificationSent = true;
+                            showNativeNotification('📰 Article téléchargé', job.article_title, job.article_id);
+                        }
+                    }).catch(() => {});
+                }
+            });
+        }
+
+        // Listen for native BackgroundPoll results (works in background)
+        if (window.Capacitor.Plugins?.BackgroundPoll) {
+            window.Capacitor.Plugins.BackgroundPoll.addListener('pollResult', (result) => {
+                console.log('[POLL] Native poll result:', result);
+                if (result.status === 'completed') {
+                    state.notificationSent = true;
+                    state.currentArticleId = result.articleId;
+                    // Update UI
+                    const card = document.getElementById('statusCard');
+                    const icon = document.getElementById('statusIcon');
+                    const title = document.getElementById('statusTitle');
+                    const sub = document.getElementById('statusSub');
+                    const fill = document.getElementById('progressFill');
+                    if (card) {
+                        fill.style.width = '100%';
+                        card.className = 'status-card visible success';
+                        icon.className = 'fas fa-check-circle';
+                        title.textContent = '✅ Terminé !';
+                        sub.textContent = result.articleTitle || 'Article';
+                    }
+                    addToHistory({
+                        id: result.articleId,
+                        title: result.articleTitle || 'Article',
+                        url: '',
+                        source: '',
+                        date: new Date().toISOString(),
+                        status: 'completed'
+                    });
+                    resetScrapeBtn();
+                    toast('✅ Article téléchargé !', 'success');
+                    openArticleById(result.articleId);
+                } else if (result.status === 'failed') {
+                    const card = document.getElementById('statusCard');
+                    const icon = document.getElementById('statusIcon');
+                    const title = document.getElementById('statusTitle');
+                    const sub = document.getElementById('statusSub');
+                    if (card) {
+                        card.className = 'status-card visible error';
+                        icon.className = 'fas fa-exclamation-triangle';
+                        title.textContent = 'Échec';
+                        sub.textContent = result.error || 'Erreur inconnue';
+                    }
+                    resetScrapeBtn();
+                }
+            });
+        }
     }
 
 })();
