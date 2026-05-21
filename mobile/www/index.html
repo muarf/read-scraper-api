@@ -1123,6 +1123,17 @@
         document.getElementById('sharedContent').textContent = text.length ? text.substring(0, 60) + (text.length > 60 ? '...' : '') : '';
         banner.classList.add('visible');
         console.log('[SHARE] banner should be visible now');
+
+        // Auto-fill input and start scraping
+        const urlInput = document.getElementById('urlInput');
+        if (urlInput) {
+            urlInput.value = text;
+            console.log('[SHARE] input filled, starting scrape');
+            // Switch to home screen if not already there
+            switchScreen('home');
+            // Start scraping automatically
+            setTimeout(() => startScraping(), 300);
+        }
     };
 
     document.getElementById('useSharedBtn').addEventListener('click', () => {
