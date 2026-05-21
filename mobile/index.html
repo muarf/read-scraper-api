@@ -1164,46 +1164,43 @@
 
     // ===== ANDROID INTEGRATION =====
     // Handle shared content from Android intents
-    // Capacitor triggerWindowJSEvent fires events on the bridge
     if (typeof window.Capacitor !== 'undefined') {
         console.log('[SHARE] Capacitor detected, registering listeners');
 
-        // Listen for events from native via Capacitor bridge
-        // triggerWindowJSEvent sends CustomEvent on document in Capacitor 8
-        document.addEventListener('sharedText', (e) => {
-            console.log('[SHARE] sharedText event on document, detail:', e.detail);
-            if (e.detail) handleSharedContent(e.detail);
-        });
-        document.addEventListener('sharedUrl', (e) => {
-            console.log('[SHARE] sharedUrl event on document, detail:', e.detail);
-            if (e.detail) handleSharedContent(e.detail);
-        });
+        // Use IntentForwarder plugin for reliable intent forwarding
+        if (window.Capacitor.Plugins?.IntentForwarder) {
+            console.log('[SHARE] Using IntentForwarder plugin');
+            window.Capacitor.Plugins.IntentForwarder.addListener('intentReceived', (result) => {
+                console.log('[SHARE] intentReceived from plugin:', result);
+                if (result?.data) {
+                    handleSharedContent(result.data);
+                }
+            });
+            // Also check for last intent (in case event was missed)
+            window.Capacitor.Plugins.IntentForwarder.getLastIntent().then((result) => {
+                console.log('[SHARE] getLastIntent result:', result);
+                if (result?.data) {
+                    handleSharedContent(result.data);
+                }
+            }).catch(() => {});
+        } else {
+            // Fallback: listen on document
+            console.log('[SHARE] IntentForwarder not available, using document listeners');
+            document.addEventListener('sharedText', (e) => {
+                console.log('[SHARE] sharedText on document:', e.detail);
+                if (e.detail) handleSharedContent(e.detail);
+            });
+            document.addEventListener('sharedUrl', (e) => {
+                console.log('[SHARE] sharedUrl on document:', e.detail);
+                if (e.detail) handleSharedContent(e.detail);
+            });
+        }
+
         document.addEventListener('openArticle', (e) => {
-            console.log('[SHARE] openArticle event on document, detail:', e.detail);
+            console.log('[SHARE] openArticle on document:', e.detail);
             if (e.detail) {
                 state.currentArticleId = e.detail;
                 openArticleById(e.detail);
-            }
-        });
-
-        // Also try window message event (some Capacitor versions)
-        window.addEventListener('message', (e) => {
-            console.log('[SHARE] window message received:', e.data);
-            if (!e.data) return;
-            const type = e.data.type || e.data.event;
-            const data = e.data.data || e.data.payload || e.data;
-            if (type === 'sharedText' || type === 'sharedUrl') {
-                if (data) handleSharedContent(typeof data === 'string' ? data : JSON.stringify(data));
-            } else if (type === 'openArticle') {
-                state.currentArticleId = data;
-                openArticleById(data);
-            }
-        });
-        window.addEventListener('openArticle', (e) => {
-            const data = e.detail || e.data;
-            if (data) {
-                state.currentArticleId = data;
-                openArticleById(data);
             }
         });
 

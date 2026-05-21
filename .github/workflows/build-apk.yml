@@ -114,6 +114,41 @@ jobs:
           "
           fi
 
+
+      - name: Copy IntentForwarder plugin source
+        run: |
+          PLUGIN_SRC="mobile/src/plugins/intent/android/src/main/java/io/qzz/pressecraper/IntentForwarderPlugin.java"
+          PLUGIN_DST="mobile/android/app/src/main/java/io/qzz/pressecraper/IntentForwarderPlugin.java"
+          if [ -f "$PLUGIN_SRC" ]; then
+            cp "$PLUGIN_SRC" "$PLUGIN_DST"
+            echo "IntentForwarder plugin copied"
+          else
+            echo "IntentForwarder plugin source not found at $PLUGIN_SRC"
+            find mobile/src -name "IntentForwarderPlugin.java" 2>/dev/null
+            exit 1
+          fi
+
+      - name: Register IntentForwarder plugin
+        run: |
+          PLUGINS_FILE="mobile/android/app/src/main/assets/capacitor.plugins.json"
+          if [ -f "$PLUGINS_FILE" ]; then
+            python3 -c "
+          import json
+          with open('$PLUGINS_FILE', 'r') as f:
+              plugins = json.load(f)
+          if not any(p.get('classpath', '').endswith('IntentForwarderPlugin') for p in plugins):
+              plugins.append({
+                  'pkg': 'IntentForwarder',
+                  'classpath': 'io.qzz.pressecraper.IntentForwarderPlugin'
+              })
+              with open('$PLUGINS_FILE', 'w') as f:
+                  json.dump(plugins, f, indent=2)
+              print('IntentForwarder plugin registered')
+          else:
+              print('IntentForwarder plugin already registered')
+          "
+          fi
+
       - name: Allow cleartext HTTP traffic
         run: |
           MANIFEST="mobile/android/app/src/main/AndroidManifest.xml"
