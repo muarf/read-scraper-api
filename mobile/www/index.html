@@ -266,14 +266,6 @@
 
         <!-- HOME SCREEN -->
         <div class="screen active" id="homeScreen">
-            <div class="shared-banner" id="sharedBanner">
-                <i class="fas fa-share-alt icon"></i>
-                <div class="text">
-                    <div class="label" id="sharedLabel">Contenu partagé</div>
-                    <div class="content" id="sharedContent"></div>
-                </div>
-                <button class="use-btn" id="useSharedBtn">Utiliser</button>
-            </div>
 
             <div class="input-card">
                 <label>URL de l'article ou termes de recherche</label>
@@ -1112,37 +1104,31 @@
     // ===== SHARED CONTENT =====
     window.handleSharedContent = function(text) {
         console.log('[SHARE] handleSharedContent called with:', text);
+        // Store globally in case JS isn't fully loaded yet
+        window.__pendingShare = text;
         state.sharedText = text;
-        const isUrl = text.match(/^https?:\/\//);
-        const banner = document.getElementById('sharedBanner');
-        if (!banner) {
-            console.log('[SHARE] sharedBanner element not found!');
-            return;
-        }
-        document.getElementById('sharedLabel').textContent = isUrl ? 'Lien partagé' : 'Texte partagé';
-        document.getElementById('sharedContent').textContent = text.length ? text.substring(0, 60) + (text.length > 60 ? '...' : '') : '';
-        banner.classList.add('visible');
-        console.log('[SHARE] banner should be visible now');
-
-        // Auto-fill input and start scraping
-        const urlInput = document.getElementById('urlInput');
-        if (urlInput) {
-            urlInput.value = text;
-            console.log('[SHARE] input filled, starting scrape');
-            // Switch to home screen if not already there
-            switchScreen('home');
-            // Start scraping automatically
-            setTimeout(() => startScraping(), 300);
+        // Try to process immediately if DOM is ready
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            applySharedContent(text);
         }
     };
 
-    document.getElementById('useSharedBtn').addEventListener('click', () => {
-        if (state.sharedText) {
-            document.getElementById('urlInput').value = state.sharedText;
-            document.getElementById('sharedBanner').classList.remove('visible');
-            document.getElementById('urlInput').focus();
+    function applySharedContent(text) {
+        if (!text || !text.trim()) return;
+        console.log('[SHARE] applySharedContent:', text);
+        const urlInput = document.getElementById('urlInput');
+        if (urlInput) {
+            urlInput.value = text;
+            // Switch to home and scrape
+            try { switchScreen('home'); } catch(e) {}
+            setTimeout(() => {
+                try { startScraping(); } catch(e) { console.error('[SHARE] startScrape error:', e); }
+            }, 500);
         }
-    });
+        window.__pendingShare = null;
+    }
+
+    // (shared banner removed - auto-scrape on share)
 
     // ===== HELPERS =====
     function toast(msg, type = '') {
@@ -1278,6 +1264,13 @@
                 }
             });
         }
+    }
+
+    // Process any shared content that arrived before JS was ready
+    if (window.__pendingShare) {
+        console.log('[SHARE] Processing pending share:', window.__pendingShare);
+        setTimeout(() => applySharedContent(window.__pendingShare), 100);
+        window.__pendingShare = null;
     }
 
 })();
