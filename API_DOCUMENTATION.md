@@ -43,6 +43,37 @@ GET /api/v1/get-temp-key
 
 ## 📊 Endpoints publics
 
+### 0. Enregistrer un appareil (Génération de clé permanente)
+
+Enregistre un appareil (app mobile, extension) et lui fournit une clé API permanente pour toutes ses requêtes futures.
+
+```http
+POST /api/v1/register
+Content-Type: application/json
+```
+
+**Body:**
+```json
+{
+  "device_id": "mon_identifiant_unique_d_appareil"
+}
+```
+
+**Réponse (201):**
+```json
+{
+  "api_key": "pk_a1b2c3d4e5f6...",
+  "device_id": "mon_identifiant_unique_d_appareil",
+  "message": "Clé API permanente générée avec succès. Conservez-la, elle ne sera plus affichée."
+}
+```
+
+**Erreurs:**
+- `400`: `device_id` manquant ou vide
+- `409`: Device déjà enregistré (Une clé existe déjà pour ce `device_id`)
+
+---
+
 ### 1. Créer un job de scraping
 
 Crée un nouveau job de scraping pour une URL donnée.
@@ -461,6 +492,35 @@ Headers: X-API-Key: votre_cle_api_admin
 
 ---
 
+### 4b. Obtenir les détails complets d'un job (Admin)
+
+Contrairement à la route publique, cette route renvoie également les logs d'exécution textuels et les captures d'écran de débug locales.
+
+```http
+GET /api/v1/admin/job/{job_id}
+Headers: X-API-Key: votre_cle_api_admin
+```
+
+**Réponse (200):**
+```json
+{
+  "job": {
+    "id": "abc1234",
+    "url": "https://...",
+    "status": "completed",
+    "data": { "raw": "..." }
+  },
+  "logs": [
+    "2026-05-22 20:27:24 - INFO - Démarrage du job..."
+  ],
+  "screenshots": [
+    "/static/debug_screenshot_abc1234.png"
+  ]
+}
+```
+
+---
+
 ### 5. Créer une clé API
 
 ```http
@@ -639,7 +699,38 @@ Content-Type: application/json
 
 ---
 
-### 12. Contrôler la queue
+### 12. Authentification Admin (Frontend)
+
+Ces routes sont utilisées par l'interface d'administration Vue.js pour valider et changer le mot de passe maître de l'instance.
+
+#### Valider le mot de passe admin
+```http
+POST /api/v1/admin/check-password
+Headers: X-API-Key: votre_cle_api_admin
+Content-Type: application/json
+```
+**Body:**
+```json
+{ "password": "mot_de_passe_a_tester" }
+```
+
+#### Changer le mot de passe admin
+```http
+POST /api/v1/admin/change-password
+Headers: X-API-Key: votre_cle_api_admin
+Content-Type: application/json
+```
+**Body:**
+```json
+{ 
+  "old_password": "ancien_mot_de_passe",
+  "new_password": "nouveau_mot_de_passe"
+}
+```
+
+---
+
+### 13. Contrôler la queue
 
 #### Arrêter le queue manager
 
@@ -793,15 +884,27 @@ GET /init
 
 Crée la première clé API admin. Doit être appelé une seule fois au démarrage.
 
+### Administration API
+- `GET /api/v1/admin/job/{job_id}` : Détails d'un job (admin)
+- `POST /admin/check-password` : Validation mot de passe admin
+- `POST /admin/change-password` : Changement mot de passe admin
+
 ### Frontend utilisateur
 
 - `/` ou `/read/` : Interface utilisateur principale
 - `/read/article/{article_id}` : Afficher un article
 - `/article/{article_id}` : Alias pour afficher un article
+- `/mobile` ou `/mobile/` : Interface dédiée à la webview de l'application mobile Android
+- `/extension` : Interface dédiée à l'extension navigateur
 
 ### Frontend admin
 
-- `/admin` ou `/read/admin` : Interface admin
+- `/admin` ou `/read/admin` : Interface d'administration globale
+- `/read/admin/logs` : Visualisation des logs système, consultez les logs système dans le répertoire `logs/`.
+
+**Logs disponibles:**
+- `logs/app.log`: Logs principaux de l'application
+- Console: Logs en temps réel
 
 ---
 
