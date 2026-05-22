@@ -154,6 +154,61 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
             'scraped_at': article['scraped_at']
         })
     
+    # Route pour supprimer un article (et son PDF associé)
+    @api_bp.route('/article/<article_id>', methods=['DELETE'])
+    @auth.require_api_key
+    def delete_article(article_id):
+        """Supprimer un article et son fichier PDF associé"""
+        article = db.get_article(article_id)
+        
+        if not article:
+            return jsonify({
+                'error': 'Article introuvable',
+                'message': f'L\'article {article_id} n\'existe pas'
+            }), 404
+            
+        # 1. Supprimer le fichier PDF si présent
+        pdf_path_str = article.get('pdf_path')
+        if pdf_path_str:
+            try:
+                pdf_path = Path(resolve_pdf_path(pdf_path_str))
+                
+                if pdf_path.exists():
+                    pdf_path.unlink()
+                    logger.info(f"Fichier PDF supprimé: {pdf_path}")
+            except Exception as e:
+                logger.warning(f"Impossible de supprimer le PDF {pdf_path_str}: {e}")
+                
+        # 2. Mettre à jour les jobs associés
+        try:
+            conn = db.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE scraping_jobs 
+                SET article_id = NULL, status = 'failed', 
+                    error_message = 'Article supprimé par l\\'utilisateur' 
+                WHERE article_id = ?
+            """, (article_id,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Impossible de mettre à jour les jobs associés: {e}")
+            
+        # 3. Supprimer de la BDD
+        success = db.delete_article(article_id)
+        
+        if success:
+            logger.info(f"Article {article_id} supprimé de la base de données")
+            return jsonify({
+                'message': f'Article {article_id} supprimé avec succès',
+                'article_id': article_id
+            })
+        else:
+            return jsonify({
+                'error': 'Erreur suppression',
+                'message': 'Impossible de supprimer l\'article de la base de données'
+            }), 500
+    
     # Route pour télécharger le PDF
     @api_bp.route('/article/<article_id>/pdf', methods=['GET'])
     @auth.require_api_key
@@ -169,16 +224,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
         
         pdf_path_str = article['pdf_path']
         
-        # Si le chemin commence par /static/, le remplacer par le chemin réel du répertoire static
-        if pdf_path_str.startswith('/static/'):
-            filename = pdf_path_str.replace('/static/', '', 1)
-            pdf_path = STATIC_DIR / filename
-        else:
-            pdf_path = Path(pdf_path_str)
-        
-        # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
-        if not pdf_path.is_absolute():
-            pdf_path = STATIC_DIR / pdf_path
+        pdf_path = Path(resolve_pdf_path(pdf_path_str))
         
         if not pdf_path.exists():
             logger.error(f"PDF introuvable: {pdf_path} (chemin original: {pdf_path_str})")
@@ -346,16 +392,7 @@ def create_api_blueprint(db: Database, cache_service: CacheService, queue_manage
         pdf_path_str = article.get('pdf_path')
         if pdf_path_str:
             try:
-                # Si le chemin commence par /static/, le remplacer par le chemin réel
-                if pdf_path_str.startswith('/static/'):
-                    filename = pdf_path_str.replace('/static/', '', 1)
-                    pdf_path = STATIC_DIR / filename
-                else:
-                    pdf_path = Path(pdf_path_str)
-                
-                # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
-                if not pdf_path.is_absolute():
-                    pdf_path = STATIC_DIR / pdf_path
+                pdf_path = Path(resolve_pdf_path(pdf_path_str))
                 
                 if pdf_path.exists():
                     pdf_path.unlink()

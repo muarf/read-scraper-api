@@ -40,7 +40,7 @@ def calculate_similarity(query, title):
     # Cap à 100
     return min(similarity_percentage, 100)
 
-def search_europresse_target(socketio, app, cookies_list, query, title, session_id, published_date=None):
+def search_europresse_target(cookies_list, query, title, session_id, published_date=None):
     """
     Effectue une recherche sur Europresse via requêtes HTTP `requests` en utilisant les cookies EZProxy interceptés.
     Retourne la liste des résultats triés par pourcentage de similarité.
@@ -78,7 +78,7 @@ def search_europresse_target(socketio, app, cookies_list, query, title, session_
         session.cookies.set(cookie['name'], cookie['value'], domain=cookie.get('domain', ''))
     
     try:
-        send_message_to_client(socketio, app, "Chargement de la page de recherche (HTTP)...", session_id)
+        send_message_to_client("Chargement de la page de recherche (HTTP)...", session_id)
         
         # Obtenir le jeton CSRF
         url_reading = f"https://{domain}/Search/Reading"
@@ -88,13 +88,13 @@ def search_europresse_target(socketio, app, cookies_list, query, title, session_
         token = token_input['value'] if token_input else ''
         
         if not token:
-            send_message_to_client(socketio, app, "Jeton de sécurité introuvable, tentative de poursuite...", session_id)
+            send_message_to_client("Jeton de sécurité introuvable, tentative de poursuite...", session_id)
 
         # Nettoyage des mots-clés (proche de la regex JS d'Ophirofox)
         import re
         clean_query = " ".join(re.findall(r"[\w\d]+", query, flags=re.UNICODE))
         
-        send_message_to_client(socketio, app, f"Recherche HTTP avancée avec : {clean_query}", session_id)
+        send_message_to_client(f"Recherche HTTP avancée avec : {clean_query}", session_id)
 
         # 2. Forge de la requête POST AdvancedSearch
         # On tente d'abord par TIT_HEAD (titre), puis en fallback par TEXT (contenu complet)
@@ -107,7 +107,7 @@ def search_europresse_target(socketio, app, cookies_list, query, title, session_
         all_results = []
         for strategy in search_strategies:
             search_term = strategy['term']
-            send_message_to_client(socketio, app, f"Recherche HTTP ({strategy['label']}) avec : {search_term}", session_id)
+            send_message_to_client(f"Recherche HTTP ({strategy['label']}) avec : {search_term}", session_id)
             
             data = {
                 "Keywords": search_term,
@@ -146,7 +146,7 @@ def search_europresse_target(socketio, app, cookies_list, query, title, session_
                 print(f"[DEBUG] strategy={strategy['key']} POST Status: {post_response.status_code}")
                 
                 # 3. Récupération des pages de résultats
-                send_message_to_client(socketio, app, f"Parsing des résultats ({strategy['label']})...", session_id)
+                send_message_to_client(f"Parsing des résultats ({strategy['label']})...", session_id)
 
                 for page_no in range(0, 3): # Limite à 3 pages pour la rapidité
                     url_page = f"https://{domain}/Search/GetPage?pageNo={page_no}&docPerPage=50"
@@ -206,11 +206,11 @@ def search_europresse_target(socketio, app, cookies_list, query, title, session_
         # Tri des résultats par similarité
         result_data_sorted = sorted(all_results, key=lambda x: x['percentage'], reverse=True)
         print(f"[DEBUG] Total résultats triés: {len(result_data_sorted)}")
-        send_message_to_client(socketio, app, f"Recherche terminée avec {len(result_data_sorted)} résultat(s).", session_id)
+        send_message_to_client(f"Recherche terminée avec {len(result_data_sorted)} résultat(s).", session_id)
         
         return result_data_sorted
 
     except Exception as e:
         error_message = str(e).encode('utf-8', errors='replace').decode('utf-8')
-        send_message_to_client(socketio, app, f"Erreur lors de la recherche Europresse HTTP : {error_message}", session_id)
+        send_message_to_client(f"Erreur lors de la recherche Europresse HTTP : {error_message}", session_id)
         return []

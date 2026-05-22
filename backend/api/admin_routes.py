@@ -563,17 +563,3 @@ def create_admin_blueprint(db: Database, queue_control_functions=None):
         }), 500
     
     return admin_bp
-
-
-def list_all_jobs(self):
-    """Méthode helper pour lister tous les jobs"""
-    conn = self.get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM scraping_jobs ORDER BY created_at DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(row) for row in rows]
-
-# Ajouter la méthode au modèle Database
-Database.list_all_jobs = list_all_jobs
-

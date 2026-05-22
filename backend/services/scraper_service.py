@@ -17,13 +17,11 @@ import re
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from web_scraper.europresse_login import login_to_europresse_bnf
 from web_scraper.europresse_search import search_europresse_target
-from web_scraper.europresse_download import download_europresse_article, sanitize_filename
+from web_scraper.europresse_download import download_europresse_article
 from web_scraper.extract_title import extract_title, extract_metadata
-from common.utils import generate_id, file_exists, NoResultException, KeywordsNeededException
+from common.utils import generate_id, file_exists, NoResultException, KeywordsNeededException, remove_highlight_tags, sanitize_filename
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-import os
-
 logger = logging.getLogger(__name__)
 
 
@@ -79,18 +77,6 @@ class ScraperService:
             logger.info("Connexion à Europresse...")
             self._login()
             self._logged_in = True
-
-    def remove_highlight_tags(self, html: str) -> str:
-        """Supprime les balises mark/highlight du HTML tout en gardant le contenu"""
-        # Supprimer récursivement toutes les balises mark (y compris imbriquées)
-        max_iterations = 10  # Éviter les boucles infinies
-        iteration = 0
-        while '<mark' in html and iteration < max_iterations:
-            html = re.sub(r'<mark[^>]*>(.*?)</mark>', r'\1', html, flags=re.DOTALL)
-            iteration += 1
-        # Supprimer les classes hlterms restantes
-        html = re.sub(r'class="hlterms"', '', html)
-        return html
 
     def _clean_search_terms(self, terms: str) -> str:
         """
@@ -211,7 +197,7 @@ class ScraperService:
         try:
             logger.info("[LOGIN] Début connexion BnF CAS")
             logger.info(f"[LOGIN] Navigateur: {self.browser}")
-            _, cookies = login_to_europresse_bnf(None, None, self.browser, USERNAME, PASSWORD, "bg_session")
+            _, cookies = login_to_europresse_bnf(self.browser, USERNAME, PASSWORD, "bg_session")
             if cookies:
                 self._cookies = cookies
                 logger.info("[LOGIN] Connexion BnF réussie, cookies extraits")
@@ -410,7 +396,7 @@ class ScraperService:
             published_date = job_data.get('published_date')
 
             # Essayer d'abord la recherche HTTP
-            articles = search_europresse_target(None, None, cookies, query, title, job_id, published_date)
+            articles = search_europresse_target(cookies, query, title, job_id, published_date)
             logger.info(f"[{job_id}] Résultat recherche HTTP ({len(articles) if articles else 0} résultats)")
 
             # Fallback : utiliser le navigateur existant avec Selenium direct
@@ -435,6 +421,28 @@ class ScraperService:
                     search_input = _Wd(self.browser, 15).until(
                         _EC.presence_of_element_located((_By.CSS_SELECTOR, 'input[name="Keywords"]'))
                     )
+                    
+                    # Forcer le filtre de période de recherche sur "Dans toutes les archives" (valeur 9)
+                    try:
+                        from selenium.webdriver.support.ui import Select as _Select
+                        _select_elem = self.browser.find_element(_By.ID, "DateFilter_DateRange")
+                        _select = _Select(_select_elem)
+                        _select.select_by_value("9")
+                        logger.info(f"[{job_id}] Période de recherche réglée sur toutes les archives (Select value '9')")
+                    except Exception as _e_select:
+                        logger.warning(f"[{job_id}] Impossible de régler la période via Select, tentative JS: {_e_select}")
+                        try:
+                            self.browser.execute_script("""
+                                var select = document.getElementById("DateFilter_DateRange");
+                                if (select) {
+                                    select.value = "9";
+                                    var event = new Event('change', { bubbles: true });
+                                    select.dispatchEvent(event);
+                                }
+                            """)
+                            logger.info(f"[{job_id}] Période de recherche réglée sur toutes les archives via JS")
+                        except Exception as _e_select_js:
+                            logger.error(f"[{job_id}] Échec du réglage de la période via JS: {_e_select_js}")
                     
                     # Supprimer les iframes et overlays bloquantes via JS
                     self.browser.execute_script("""
@@ -478,9 +486,7 @@ class ScraperService:
                     search_input.clear()
                     _t.sleep(0.3)
                     # Le formulaire Europresse attend "TEXT= <query>" comme valeur
-                    # Utiliser une recherche plus courte pour maximiser les chances de trouver
-                    _search_query = query[:50] if len(query) > 50 else query
-                    search_input.send_keys(f"TEXT= {_search_query}")
+                    search_input.send_keys(f"TEXT= {query}")
                     _t.sleep(1)
 
                     # Vérifier la valeur
@@ -653,14 +659,39 @@ class ScraperService:
             
             # Étape 4: Télécharger le contenu de l'article HTTP
             logger.info(f"[{job_id}] Téléchargement du contenu (HTTP)...")
-            html_content = download_europresse_article(None, None, link, cookies, job_id)
+            html_content = download_europresse_article(link, cookies, job_id)
+
+            if html_content is None and self.browser is not None:
+                logger.info(f"[{job_id}] HTTP download failed, trying Selenium download fallback...")
+                try:
+                    from bs4 import BeautifulSoup as _Bs
+                    import time as _t
+                    domain = "nouveau-europresse-com.bnf.idm.oclc.org"
+                    article_url = f"https://{domain}/Document/ViewMobile?docKey={link}&fromBasket=false&viewEvent=1&invoiceCode="
+                    self.browser.get(article_url)
+                    _t.sleep(5)
+                    
+                    # Parse the page using BeautifulSoup
+                    _soup = _Bs(self.browser.page_source, 'html.parser')
+                    content_div = _soup.find(class_='docOcurrContainer')
+                    if content_div:
+                        title_elem = _soup.find(class_='titreArticleVisu')
+                        title_text = title_elem.get_text(strip=True) if title_elem else ''
+                        html_content = str(content_div)
+                        if title_text:
+                            html_content = f"<h1>{title_text}</h1>{html_content}"
+                        logger.info(f"[{job_id}] Selenium download fallback succeeded!")
+                    else:
+                        logger.error(f"[{job_id}] Selenium download fallback failed: docOcurrContainer not found in page source.")
+                except Exception as _e_dl:
+                    logger.error(f"[{job_id}] Selenium download fallback error: {_e_dl}")
 
             if html_content is None:
                 raise Exception("Impossible de télécharger le contenu de l'article")
 
             # Nettoyer les balises de surlignement AVANT de générer PDF/HTML et sauvegarder en BDD
             logger.info(f"[{job_id}] Nettoyage des balises <mark> du contenu HTML...")
-            html_content = self.remove_highlight_tags(html_content)
+            html_content = remove_highlight_tags(html_content)
             logger.info(f"[{job_id}] Balises <mark> nettoyées")
 
             # Étape 5: Générer le PDF

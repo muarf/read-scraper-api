@@ -3,7 +3,7 @@ FROM python:3.10-bookworm
 
 # Installer les dépendances système AVANT de copier les fichiers
 RUN apt-get update && \
-    apt-get install -y chromium-driver wkhtmltopdf && \
+    apt-get install -y chromium-driver && \
     wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt install ./google-chrome-stable_current_amd64.deb -y && \
     rm google-chrome-stable_current_amd64.deb && \
@@ -13,10 +13,13 @@ RUN apt-get update && \
 WORKDIR /app
 
 # Copier les fichiers nécessaires
+COPY backend /app/backend
 COPY common /app/common
-COPY server /app/server
-COPY static /app/static
+COPY frontend /app/frontend
+COPY admin /app/admin
 COPY web_scraper /app/web_scraper
+COPY static /app/static
+COPY .env* /app/
 COPY requirements.txt /app/
 
 # Installer les dépendances Python
@@ -25,4 +28,4 @@ RUN pip install -r /app/requirements.txt
 ENV PYTHONPATH "${PYTHONPATH}:/app/web_scraper"
 
 # Définir la commande d'exécution
-CMD ["python", "server/server.py"]
+CMD ["python", "-m", "backend.main"]

@@ -6,7 +6,7 @@ echo ""
 
 # Arrêter toute instance précédente
 echo "⏹️  Arrêt des instances précédentes..."
-pkill -f "python.*run_api.py" || pkill -f "python.*main.py" || true
+pkill -f "python.*backend.main" || pkill -f "python.*main.py" || true
 sleep 2
 
 # Vérifier si la clé API existe
@@ -14,7 +14,7 @@ API_KEY_FILE=".api_key"
 
 if [ ! -f "$API_KEY_FILE" ]; then
     echo "🔑 Création de la clé API initiale..."
-    python3 run_api.py &
+    python3 -m backend.main &
     APP_PID=$!
     sleep 5
     
@@ -45,7 +45,7 @@ fi
 # Démarrer l'application
 echo ""
 echo "▶️  Démarrage de l'application..."
-python3 run_api.py > logs/api.log 2>&1 &
+python3 -m backend.main > logs/api.log 2>&1 &
 APP_PID=$!
 
 # Attendre que l'app démarre

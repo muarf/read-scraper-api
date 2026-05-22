@@ -8,8 +8,10 @@ services:
     environment:
       - CHROMEDRIVER_PATH=/usr/bin/chromedriver
     volumes:
-      - ./server:/app/server
+      - ./backend:/app/backend
       - ./common:/app/common
+      - ./frontend:/app/frontend
+      - ./admin:/app/admin
       - ./static:/app/static
       - ./web_scraper:/app/web_scraper
     depends_on:

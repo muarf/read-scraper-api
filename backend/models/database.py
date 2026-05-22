@@ -486,8 +486,10 @@ class Database:
         }
 
     def _cleanup_static_files(self, days_static_files: int) -> int:
-        """Supprimer les fichiers statiques (HTML/PDF) plus anciens que la limite"""
+        """Supprimer les fichiers statiques (HTML/PDF) plus anciens que la limite
+        et les screenshots de debug (PNG) de plus de 3 jours."""
         cutoff_date = datetime.now() - timedelta(days=days_static_files)
+        cutoff_debug = datetime.now() - timedelta(days=3)
         files_deleted = 0
 
         if not STATIC_DIR.exists():
@@ -502,10 +504,22 @@ class Database:
                         files_deleted += 1
                         logger.debug("Fichier statique supprimé: %s", file_path)
                 except FileNotFoundError:
-                    # Le fichier peut avoir été supprimé par un autre processus
                     continue
                 except Exception as e:
                     logger.warning("Impossible de supprimer %s: %s", file_path, e)
+
+        # Nettoyer les screenshots de debug de plus de 3 jours
+        for file_path in STATIC_DIR.glob("debug_*.png"):
+            try:
+                file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+                if file_mtime < cutoff_debug:
+                    file_path.unlink()
+                    files_deleted += 1
+                    logger.debug("Screenshot debug supprimé: %s", file_path)
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                logger.warning("Impossible de supprimer %s: %s", file_path, e)
 
         return files_deleted
 
@@ -605,3 +619,11 @@ class Database:
         finally:
             conn.close()
 
+    def list_all_jobs(self):
+        """Méthode helper pour lister tous les jobs"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM scraping_jobs ORDER BY created_at DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]

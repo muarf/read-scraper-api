@@ -24,11 +24,9 @@ from backend.api.admin_routes import create_admin_blueprint
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
-from pathlib import Path
-
 # Configuration du logging avec rotation
-# Créer le répertoire 'logs' s'il n'existe pas
-log_dir = Path('logs')
+from backend.config.settings import LOGS_DIR
+log_dir = LOGS_DIR
 log_dir.mkdir(parents=True, exist_ok=True)
 
 # Configurer le TimedRotatingFileHandler pour une rotation quotidienne
@@ -262,16 +260,8 @@ def public_download_pdf(article_id):
     
     pdf_path_str = article['pdf_path']
     
-    # Si le chemin commence par /static/, le remplacer par le chemin réel du répertoire static
-    if pdf_path_str.startswith('/static/'):
-        filename = pdf_path_str.replace('/static/', '', 1)
-        pdf_path = STATIC_DIR / filename
-    else:
-        pdf_path = Path(pdf_path_str)
-    
-    # Si le chemin n'est pas absolu, supposer qu'il est relatif à STATIC_DIR
-    if not pdf_path.is_absolute():
-        pdf_path = STATIC_DIR / pdf_path
+    from common.utils import resolve_pdf_path
+    pdf_path = Path(resolve_pdf_path(pdf_path_str))
     
     if not pdf_path.exists():
         logger.error(f"PDF introuvable: {pdf_path} (chemin original: {pdf_path_str})")

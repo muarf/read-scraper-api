@@ -8,7 +8,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 class OphirofoxEngine:
-    def __init__(self, op_dir="/app/web_scraper/ophirofox/ophirofox"):
+    def __init__(self, op_dir=None):
+        if op_dir is None:
+            op_dir = Path(__file__).parent / "ophirofox" / "ophirofox"
         self.op_dir = Path(op_dir)
         self.manifest_path = self.op_dir / "manifest.json"
         self.mappings = []

@@ -10,8 +10,53 @@ import unicodedata
 from common.utils import send_message_to_client
 from web_scraper.ophirofox_bridge import OphirofoxEngine
 
+try:
+    from spellchecker import SpellChecker
+    spell = SpellChecker(language='fr')
+    # Construire un dictionnaire de mots valides sans accents pour matcher les slugs d'URL
+    unaccented_spell = set()
+    for w in spell.word_frequency.words():
+        # Enlever les accents du mot
+        unaccented_w = unicodedata.normalize('NFKD', w).encode('ASCII', 'ignore').decode('utf-8')
+        unaccented_spell.add(unaccented_w)
+except:
+    spell = None
+    unaccented_spell = set()
+
 # Initialisation globale du moteur Ophirofox
 ophirofox = OphirofoxEngine(op_dir="/app/web_scraper/ophirofox/ophirofox")
+
+def _fix_missing_apostrophes(text):
+    if not spell or not text:
+        return text
+        
+    words = text.split()
+    fixed_words = []
+    prefixes = ['d', 'l', 'qu', 'm', 't', 's', 'n', 'c', 'j']
+    
+    # Mots valides qui sont presque toujours des élisions (d'une, l'une) dans les URLs
+    always_split = {
+        'dune': 'd une',
+        'dunes': 'd unes',
+        'lune': 'l une',
+        'lunes': 'l unes'
+    }
+    
+    for word in words:
+        if word in always_split:
+            word = always_split[word]
+        elif word not in spell:
+            # Chercher un préfixe valide
+            for prefix in prefixes:
+                if word.startswith(prefix) and len(word) > len(prefix):
+                    remainder = word[len(prefix):]
+                    # Si le reste du mot existe dans le dictionnaire, MÊME SANS ACCENTS
+                    if remainder in unaccented_spell or remainder in spell:
+                        word = f"{prefix} {remainder}"
+                        break
+        fixed_words.append(word)
+        
+    return " ".join(fixed_words)
 
 def _process_title_to_query(title, max_words=15):
     """Nettoyage de titre pour Europresse et génération de query"""
