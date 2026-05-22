@@ -15,9 +15,16 @@ L'API Read Scraper permet de scraper des articles depuis différentes sources, d
 
 Toutes les requêtes API nécessitent un header `X-API-Key` contenant une clé API valide.
 
-### Obtenir une clé API temporaire
+Il existe **deux types** de clés API :
 
-Vous pouvez obtenir une clé API temporaire (valide 24h) sans authentification :
+### 1. Clé API permanente (Recommandé pour la production)
+
+Ces clés **n'expirent jamais** (sauf si révoquées par un administrateur).
+Pour créer une clé API permanente, vous devez d'abord générer la toute première clé admin via la route `/init`, puis utiliser les endpoints d'administration (`POST /api/v1/admin/apikeys`) pour créer vos autres clés permanentes.
+
+### 2. Obtenir une clé API temporaire (Pour les tests)
+
+Si vous voulez juste tester l'API rapidement, vous pouvez générer une clé temporaire **(valable uniquement 24 heures)** sans aucune authentification préalable :
 
 ```bash
 GET /api/v1/get-temp-key
@@ -31,10 +38,6 @@ GET /api/v1/get-temp-key
   "message": "Clé API temporaire créée (valide 24h)"
 }
 ```
-
-### Clé API permanente
-
-Pour créer une clé API permanente, vous devez d'abord créer une clé admin via `/init`, puis utiliser les endpoints admin pour créer d'autres clés.
 
 ---
 
@@ -774,7 +777,7 @@ En cas de dépassement, une erreur `429` est retournée.
 3. **Queue** : Le traitement est asynchrone, utilisez le polling pour suivre la progression
 4. **Screenshots de debug** : Disponibles uniquement pendant le traitement (supprimés automatiquement après completion)
 5. **PDFs** : Générés automatiquement pour tous les articles scrapés
-6. **Nettoyage automatique** : Les articles de plus de 30 jours sont supprimés automatiquement
+6. **Nettoyage automatique** : Les articles (et fichiers PDF) de plus de 7 jours sont supprimés automatiquement lors du cycle de nettoyage.
 7. **Termes de recherche personnalisés** : Utilisez le paramètre `search_terms` si l'extraction automatique échoue ou ne trouve aucun résultat
 8. **Retry automatique** : Les erreurs techniques sont automatiquement relancées jusqu'à 3 fois, sauf les erreurs "Aucun résultat trouvé" qui échouent immédiatement
 
