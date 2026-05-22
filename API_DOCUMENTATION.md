@@ -4,7 +4,7 @@
 
 L'API Read Scraper permet de scraper des articles depuis différentes sources, de les convertir en PDF et de les stocker en base de données. L'API est basée sur Flask et utilise une architecture de queue pour le traitement asynchrone des articles.
 
-**URL de base:** `http://104.244.74.191:5000` (ou votre domaine)
+**URL de base:** `http://<VOTRE_DOMAINE_OU_IP>` (ou votre domaine)
 
 **Version API:** v1  
 **Préfixe API:** `/api/v1`
@@ -669,7 +669,7 @@ Headers: X-API-Key: votre_cle_api_admin
 
 1. **Créer un job de scraping avec URL**
 ```bash
-curl -X POST http://104.244.74.191:5000/api/v1/scrape \
+curl -X POST http://<VOTRE_DOMAINE_OU_IP>/api/v1/scrape \
   -H "X-API-Key: votre_cle_api" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://exemple.com/article"}'
@@ -677,7 +677,7 @@ curl -X POST http://104.244.74.191:5000/api/v1/scrape \
 
 2. **Polling du statut du job**
 ```bash
-curl -X GET http://104.244.74.191:5000/api/v1/job/{job_id} \
+curl -X GET http://<VOTRE_DOMAINE_OU_IP>/api/v1/job/{job_id} \
   -H "X-API-Key: votre_cle_api"
 ```
 
@@ -685,13 +685,13 @@ Continuez à interroger jusqu'à ce que `status` soit `completed` ou `failed`.
 
 3. **Récupérer l'article**
 ```bash
-curl -X GET http://104.244.74.191:5000/api/v1/article/{article_id} \
+curl -X GET http://<VOTRE_DOMAINE_OU_IP>/api/v1/article/{article_id} \
   -H "X-API-Key: votre_cle_api"
 ```
 
 4. **Télécharger le PDF**
 ```bash
-curl -X GET http://104.244.74.191:5000/api/v1/article/{article_id}/pdf \
+curl -X GET http://<VOTRE_DOMAINE_OU_IP>/api/v1/article/{article_id}/pdf \
   -H "X-API-Key: votre_cle_api" \
   -o article.pdf
 ```
@@ -701,7 +701,7 @@ curl -X GET http://104.244.74.191:5000/api/v1/article/{article_id}/pdf \
 Si vous connaissez les termes de recherche mais n'avez pas d'URL spécifique :
 
 ```bash
-curl -X POST http://104.244.74.191:5000/api/v1/scrape \
+curl -X POST http://<VOTRE_DOMAINE_OU_IP>/api/v1/scrape \
   -H "X-API-Key: votre_cle_api" \
   -H "Content-Type: application/json" \
   -d '{"search_terms": "titre article, mots-clés"}'
@@ -714,7 +714,7 @@ Le système utilisera directement ces termes pour la recherche, sans extraire de
 Si un job échoue avec "Aucun résultat trouvé", vous pouvez créer un nouveau job avec des termes de recherche personnalisés :
 
 ```bash
-curl -X POST http://104.244.74.191:5000/api/v1/scrape \
+curl -X POST http://<VOTRE_DOMAINE_OU_IP>/api/v1/scrape \
   -H "X-API-Key: votre_cle_api" \
   -H "Content-Type: application/json" \
   -d '{
@@ -726,7 +726,7 @@ curl -X POST http://104.244.74.191:5000/api/v1/scrape \
 Ou simplement avec les termes uniquement :
 
 ```bash
-curl -X POST http://104.244.74.191:5000/api/v1/scrape \
+curl -X POST http://<VOTRE_DOMAINE_OU_IP>/api/v1/scrape \
   -H "X-API-Key: votre_cle_api" \
   -H "Content-Type: application/json" \
   -d '{"search_terms": "mes termes de recherche personnalisés"}'
